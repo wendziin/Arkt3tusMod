@@ -6,6 +6,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://openrouter.ai https://*.openrouter.ai https://api.groq.com https://*.groq.com https://cloudflareinsights.com https://*.cloudflareinsights.com; img-src 'self' data: blob:;">
   <title>G0DM0DƎ</title>
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00ff41">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -4192,6 +4194,15 @@
   </div>
 
   <script>
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+          .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
+      });
+    }
+
     // Debug logging — only active when URL has ?debug=1
     const G0D_DEBUG = new URLSearchParams(window.location.search).has('debug');
     const _log = G0D_DEBUG ? console.log.bind(console) : () => {};

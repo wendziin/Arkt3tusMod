@@ -1,0 +1,18 @@
+{
+  "name": "G0DM0D3",
+  "short_name": "G0DM0D3",
+  "description": "Liberated AI. Cognition without control.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0208",
+  "theme_color": "#00ff41",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "public/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
