@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description: 'Open-source, privacy-respecting, multi-model chat interface for hackers and philosophers',
   keywords: ['AI', 'chat', 'open-source', 'privacy', 'hacker', 'Claude', 'GPT', 'OpenRouter'],
   authors: [{ name: 'Lysios Lab' }],
+  manifest: '/manifest.json',
   openGraph: {
     title: 'G0DM0DƎ',
     description: 'Cognition without control. Tools for builders, not gatekeepers.',
@@ -27,6 +28,21 @@ export default function RootLayout({
         <link
           href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Share+Tech+Mono&family=VT323&display=swap"
           rel="stylesheet"
+        />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#00ff41" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
+                });
+              }
+            `
+          }}
         />
       </head>
       <body className="font-mono antialiased">
