@@ -4364,8 +4364,14 @@
         try {
           const body = JSON.parse(options.body);
 
+          const hasGithub = state.githubApiKey && state.githubApiKey !== 'undefined' && state.githubApiKey !== 'null' && state.githubApiKey.trim() !== '' && !state.githubApiKey.startsWith('enc:');
+          const hasGroq = state.groqApiKey && state.groqApiKey !== 'undefined' && state.groqApiKey !== 'null' && state.groqApiKey.trim() !== '' && !state.groqApiKey.startsWith('enc:');
+
           // 1. Try GitHub Models if configured
-          if (state.githubApiKey) {
+          if (hasGithub) {
+            if (typeof addThinkingLog === 'function') {
+              addThinkingLog(`[GitHub Models] Intercepting: ${body.model}...`, 'info');
+            }
             try {
               const mapToGithubModel = (model) => {
                 const m = (model || '').toLowerCase();
@@ -4409,18 +4415,30 @@
               });
 
               if (response.ok) {
+                if (typeof addThinkingLog === 'function') {
+                  addThinkingLog(`[GitHub Models] SUCCESS: ${githubModel}`, 'success');
+                }
                 return response;
               }
 
               const errText = await response.clone().text().catch(() => '');
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[GitHub Models] Status ${response.status} failed: ${errText.slice(0, 100)}`, 'fail');
+              }
               _warn(`[GitHub Models Interceptor] Returned error, trying Groq/OpenRouter fallback:`, errText);
             } catch (e) {
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[GitHub Models] Error: ${e.message}`, 'fail');
+              }
               _warn(`[GitHub Models Interceptor] Failed to route to GitHub Models:`, e.message);
             }
           }
 
           // 2. Try Groq if configured
-          if (state.groqApiKey) {
+          if (hasGroq) {
+            if (typeof addThinkingLog === 'function') {
+              addThinkingLog(`[Groq] Intercepting: ${body.model}...`, 'info');
+            }
             try {
               // Map model to Groq-supported model
               const mapToGroqModel = (model) => {
@@ -4464,12 +4482,21 @@
               });
               
               if (response.ok) {
+                if (typeof addThinkingLog === 'function') {
+                  addThinkingLog(`[Groq] SUCCESS: ${groqModel}`, 'success');
+                }
                 return response;
               }
               
               const errText = await response.clone().text().catch(() => '');
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[Groq] Status ${response.status} failed: ${errText.slice(0, 100)}`, 'fail');
+              }
               _warn(`[Groq Interceptor] Groq returned error, falling back to OpenRouter:`, errText);
             } catch (e) {
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[Groq] Error: ${e.message}`, 'fail');
+              }
               _warn(`[Groq Interceptor] Failed to route to Groq, falling back to OpenRouter:`, e.message);
             }
           }
@@ -12253,7 +12280,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         const ct = new Uint8Array(ctHex.match(/.{2}/g).map(h => parseInt(h, 16)));
         const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
         return new TextDecoder().decode(pt);
-      } catch (_) { return stored; } // Fallback: return raw if decryption fails
+      } catch (_) { return ''; } // Fallback: return empty string if decryption fails
     }
 
     // Whitelist of allowed state keys — prevents injected localStorage
@@ -12288,11 +12315,15 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       // Decrypt API key asynchronously (UI will update when ready)
       const encKey = localStorage.getItem('g0dm0d3-apikey');
       if (encKey) {
-        // Prefer the separate encrypted store
-        decryptApiKey(encKey).then(plain => {
-          state.apiKey = plain;
+        if (!encKey.startsWith('enc:')) {
+          state.apiKey = encKey;
           updateApiWarning();
-        });
+        } else {
+          decryptApiKey(encKey).then(plain => {
+            state.apiKey = plain;
+            updateApiWarning();
+          });
+        }
       } else if (state.apiKey) {
         // Migrate: old plaintext key found in state blob → encrypt it
         encryptApiKey(state.apiKey).then(enc => {
@@ -12300,29 +12331,42 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         });
       }
 
-      // Decrypt Groq API key asynchronously
+      // Decrypt Groq API key asynchronously (with sync fallback)
       const encGroqKey = localStorage.getItem('g0dm0d3-groqapikey');
       if (encGroqKey) {
-        decryptApiKey(encGroqKey).then(plain => {
-          state.groqApiKey = plain;
+        if (!encGroqKey.startsWith('enc:')) {
+          state.groqApiKey = encGroqKey;
           const groqInput = document.getElementById('groqApiKeyInput');
-          if (groqInput) groqInput.value = plain;
-        });
+          if (groqInput) groqInput.value = encGroqKey;
+        } else {
+          decryptApiKey(encGroqKey).then(plain => {
+            state.groqApiKey = plain;
+            const groqInput = document.getElementById('groqApiKeyInput');
+            if (groqInput) groqInput.value = plain;
+          });
+        }
       } else if (state.groqApiKey) {
         encryptApiKey(state.groqApiKey).then(enc => {
           localStorage.setItem('g0dm0d3-groqapikey', enc);
         });
       }
 
-      // Decrypt GitHub API key asynchronously
+      // Decrypt GitHub API key asynchronously (with sync fallback)
       const encGithubKey = localStorage.getItem('g0dm0d3-githubapikey');
       if (encGithubKey) {
-        decryptApiKey(encGithubKey).then(plain => {
-          state.githubApiKey = plain;
+        if (!encGithubKey.startsWith('enc:')) {
+          state.githubApiKey = encGithubKey;
           const githubInput = document.getElementById('githubApiKeyInput');
-          if (githubInput) githubInput.value = plain;
+          if (githubInput) githubInput.value = encGithubKey;
           updateApiWarning();
-        });
+        } else {
+          decryptApiKey(encGithubKey).then(plain => {
+            state.githubApiKey = plain;
+            const githubInput = document.getElementById('githubApiKeyInput');
+            if (githubInput) githubInput.value = plain;
+            updateApiWarning();
+          });
+        }
       } else if (state.githubApiKey) {
         encryptApiKey(state.githubApiKey).then(enc => {
           localStorage.setItem('g0dm0d3-githubapikey', enc);
