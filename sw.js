@@ -3,7 +3,8 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './public/favicon.svg'
+  './public/favicon.svg',
+  './public/logo.jpg'
 ];
 
 // Install Event
