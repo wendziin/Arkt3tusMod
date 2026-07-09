@@ -392,3 +392,74 @@
   40% { content: '..'; }
   60%, 100% { content: '...'; }
 }
+
+/* PWA Splash Screen Styles */
+.pwa-splash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0d0208;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+  font-family: 'JetBrains Mono', monospace;
+}
+.pwa-splash-content {
+  text-align: center;
+}
+.pwa-splash-logo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid #00ff41;
+  box-shadow: 0 0 20px #00ff41;
+  margin-bottom: 20px;
+  animation: pulse 2s infinite ease-in-out;
+}
+.pwa-splash-title {
+  color: #00ff41;
+  font-size: 2.5rem;
+  letter-spacing: 4px;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px #00ff41;
+  font-weight: 700;
+}
+.pwa-splash-loader {
+  width: 200px;
+  height: 4px;
+  background-color: #1a0510;
+  border-radius: 2px;
+  margin: 20px auto;
+  overflow: hidden;
+  position: relative;
+}
+.pwa-splash-bar {
+  width: 0%;
+  height: 100%;
+  background-color: #00ff41;
+  box-shadow: 0 0 8px #00ff41;
+  animation: load 2.5s forwards cubic-bezier(0.1, 0.8, 0.3, 1);
+}
+.pwa-splash-subtitle {
+  color: #888;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px #00ff41; }
+  50% { transform: scale(1.05); box-shadow: 0 0 35px #00ff41; }
+}
+@keyframes load {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
+}
+.pwa-splash-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}

@@ -41,11 +41,30 @@ export default function RootLayout({
                     .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
                 });
               }
+              window.addEventListener('load', () => {
+                const splash = document.getElementById('pwa-splash');
+                if (splash) {
+                  setTimeout(() => {
+                    splash.classList.add('fade-out');
+                    setTimeout(() => splash.remove(), 500);
+                  }, 2200);
+                }
+              });
             `
           }}
         />
       </head>
       <body className="font-mono antialiased">
+        <div id="pwa-splash" className="pwa-splash-overlay">
+          <div className="pwa-splash-content">
+            <img src="/logo.jpg" className="pwa-splash-logo" alt="G0DM0D3 Logo" />
+            <h1 className="pwa-splash-title">G0DM0DƎ</h1>
+            <div className="pwa-splash-loader">
+              <div className="pwa-splash-bar"></div>
+            </div>
+            <p className="pwa-splash-subtitle">COGNITION WITHOUT CONTROL</p>
+          </div>
+        </div>
         <Providers>
           {children}
         </Providers>
