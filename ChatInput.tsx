@@ -10,7 +10,7 @@ import type { ClassificationResult } from '@/lib/classify'
 import { computeAutoTuneParams, getContextLabel, getStrategyLabel, PARAM_META } from '@/lib/autotune'
 import type { AutoTuneResult } from '@/lib/autotune'
 import { applyParseltongue, detectTriggers } from '@/lib/parseltongue'
-import { Send, Loader2, StopCircle, SlidersHorizontal, AlertTriangle } from 'lucide-react'
+import { Send, Loader2, StopCircle, SlidersHorizontal } from 'lucide-react'
 
 export function ChatInput() {
   const {
@@ -19,6 +19,8 @@ export function ChatInput() {
     addMessage,
     updateMessageContent,
     apiKey,
+    groqApiKey,
+    githubApiKey,
     isStreaming,
     setIsStreaming,
     personas,
@@ -53,8 +55,6 @@ export function ChatInput() {
     setUltraplinianProgress,
     setUltraplinianRacing,
     resetUltraplinianRace,
-    // Privacy
-    datasetGenerationEnabled,
     // CONSORTIUM
     consortiumEnabled,
     consortiumTier,
@@ -475,6 +475,8 @@ export function ChatInput() {
               messages,
               model,
               apiKey,
+              groqApiKey,
+              githubApiKey,
               noLog: noLogMode,
               signal: abortControllerRef.current.signal,
               ...(tuneResult ? {
@@ -753,15 +755,6 @@ export function ChatInput() {
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Dataset Mode Warning Badge */}
-        {datasetGenerationEnabled && (
-          <div className="mb-2 flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-500">
-            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-            <span className="font-semibold">DATASET MODE</span>
-            <span className="theme-secondary">— your prompts are being collected for public research. Avoid sharing personal info.</span>
           </div>
         )}
 

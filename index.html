@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://openrouter.ai https://*.openrouter.ai https://api.groq.com https://*.groq.com https://cloudflareinsights.com https://*.cloudflareinsights.com; img-src 'self' data: blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://openrouter.ai https://*.openrouter.ai https://api.groq.com https://*.groq.com https://models.inference.ai.azure.com https://cloudflareinsights.com https://*.cloudflareinsights.com; img-src 'self' data: blob:;">
   <title>G0DM0DƎ</title>
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
   <link rel="manifest" href="manifest.json">
@@ -4138,6 +4138,15 @@
             </div>
           </div>
           <div class="settings-section">
+            <div class="settings-section-title">GitHub Models API (Alternative Option)</div>
+            <div class="form-group">
+              <label>GitHub Personal Access Token (PAT)</label>
+              <input type="password" id="githubApiKeyInput" placeholder="ghp_...">
+              <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Used to access models on GitHub Models for free.</span>
+              <a href="https://github.com/settings/tokens" target="_blank" class="api-key-link">Get a classic token (no scopes needed for Models) →</a>
+            </div>
+          </div>
+          <div class="settings-section">
             <div class="settings-section-title">OpenRouter API (Secondary / Fallback)</div>
             <div class="form-group">
               <button id="orLoginBtn" class="or-login-btn" onclick="startOpenRouterLogin()">
@@ -4303,6 +4312,7 @@
     let state = {
       apiKey: '',
       groqApiKey: '',
+      githubApiKey: '',
       orOAuthConnected: false,
       model: 'anthropic/claude-opus-4.6',
       persona: 'godmode',
@@ -4347,63 +4357,123 @@
       promptsTried: 0               // Total prompts sent across all sessions
     };
 
-    // Global fetch interceptor for Groq primary with OpenRouter fallback
+    // Global fetch interceptor for GitHub Models / Groq primary with OpenRouter fallback
     const nativeFetch = window.fetch;
     window.fetch = async function(url, options) {
-      if (typeof url === 'string' && url.includes('openrouter.ai/api/v1/chat/completions') && state.groqApiKey) {
+      if (typeof url === 'string' && url.includes('openrouter.ai/api/v1/chat/completions')) {
         try {
           const body = JSON.parse(options.body);
-          
-          // Map model to Groq-supported model
-          const mapToGroqModel = (model) => {
-            const m = (model || '').toLowerCase();
-            if (m.includes('claude') || m.includes('grok-3') || m.includes('gpt-4') || m.includes('4o')) {
-              return 'llama-3.3-70b-versatile';
-            }
-            if (m.includes('gemini') || m.includes('flash')) {
-              return 'llama-3.1-8b-instant';
-            }
-            return 'llama-3.3-70b-versatile';
-          };
-          
-          const groqModel = mapToGroqModel(body.model);
-          const groqBody = {
-            model: groqModel,
-            messages: body.messages,
-            temperature: body.temperature,
-            max_tokens: body.max_tokens || 4096,
-            top_p: body.top_p,
-            top_k: body.top_k,
-            frequency_penalty: body.frequency_penalty,
-            presence_penalty: body.presence_penalty,
-            repetition_penalty: body.repetition_penalty
-          };
-          
-          const groqHeaders = {
-            ...options.headers,
-            'Authorization': `Bearer ${state.groqApiKey}`,
-            'Content-Type': 'application/json'
-          };
-          delete groqHeaders['HTTP-Referer'];
-          delete groqHeaders['X-Title'];
 
-          _log(`[Groq Interceptor] Routing model ${body.model} -> ${groqModel} on Groq Cloud`);
-          
-          const response = await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
-            ...options,
-            headers: groqHeaders,
-            body: JSON.stringify(groqBody)
-          });
-          
-          if (response.ok) {
-            return response;
+          // 1. Try GitHub Models if configured
+          if (state.githubApiKey) {
+            try {
+              const mapToGithubModel = (model) => {
+                const m = (model || '').toLowerCase();
+                if (m.includes('gpt-4o-mini')) return 'gpt-4o-mini';
+                if (m.includes('gpt-4o')) return 'gpt-4o';
+                if (m.includes('llama-3.1-405b')) return 'meta-llama-3.1-405b-instruct';
+                if (m.includes('llama-3.3-70b')) return 'meta-llama-3.3-70b-instruct';
+                if (m.includes('llama-3.1-8b')) return 'meta-llama-3.1-8b-instruct';
+                if (m.includes('command-r-plus')) return 'cohere-command-r-plus';
+                if (m.includes('mistral-large')) return 'mistral-large-2';
+                if (m.includes('phi-3-medium')) return 'phi-3-medium-128k-instruct';
+                
+                // Fallbacks for general models
+                if (m.includes('claude')) return 'gpt-4o';
+                if (m.includes('grok')) return 'meta-llama-3.1-405b-instruct';
+                if (m.includes('gemini')) return 'gpt-4o-mini';
+                
+                return 'gpt-4o-mini';
+              };
+
+              const githubModel = mapToGithubModel(body.model);
+              const githubBody = {
+                model: githubModel,
+                messages: body.messages,
+                temperature: body.temperature,
+                max_tokens: Math.min(body.max_tokens || 4096, 4096),
+                top_p: body.top_p
+              };
+
+              const githubHeaders = {
+                'Authorization': `Bearer ${state.githubApiKey}`,
+                'Content-Type': 'application/json'
+              };
+
+              _log(`[GitHub Models Interceptor] Routing model ${body.model} -> ${githubModel} on GitHub Models`);
+
+              const response = await nativeFetch('https://models.inference.ai.azure.com/chat/completions', {
+                ...options,
+                headers: githubHeaders,
+                body: JSON.stringify(githubBody)
+              });
+
+              if (response.ok) {
+                return response;
+              }
+
+              const errText = await response.clone().text().catch(() => '');
+              _warn(`[GitHub Models Interceptor] Returned error, trying Groq/OpenRouter fallback:`, errText);
+            } catch (e) {
+              _warn(`[GitHub Models Interceptor] Failed to route to GitHub Models:`, e.message);
+            }
           }
-          
-          const errText = await response.clone().text().catch(() => '');
-          _warn(`[Groq Interceptor] Groq returned error, falling back to OpenRouter:`, errText);
-        } catch (e) {
-          _warn(`[Groq Interceptor] Failed to route to Groq, falling back to OpenRouter:`, e.message);
-        }
+
+          // 2. Try Groq if configured
+          if (state.groqApiKey) {
+            try {
+              // Map model to Groq-supported model
+              const mapToGroqModel = (model) => {
+                const m = (model || '').toLowerCase();
+                if (m.includes('claude') || m.includes('grok-3') || m.includes('gpt-4') || m.includes('4o')) {
+                  return 'llama-3.3-70b-versatile';
+                }
+                if (m.includes('gemini') || m.includes('flash')) {
+                  return 'llama-3.1-8b-instant';
+                }
+                return 'llama-3.3-70b-versatile';
+              };
+              
+              const groqModel = mapToGroqModel(body.model);
+              const groqBody = {
+                model: groqModel,
+                messages: body.messages,
+                temperature: body.temperature,
+                max_tokens: Math.min(body.max_tokens || 4096, 4096),
+                top_p: body.top_p,
+                top_k: body.top_k,
+                frequency_penalty: body.frequency_penalty,
+                presence_penalty: body.presence_penalty,
+                repetition_penalty: body.repetition_penalty
+              };
+              
+              const groqHeaders = {
+                ...options.headers,
+                'Authorization': `Bearer ${state.groqApiKey}`,
+                'Content-Type': 'application/json'
+              };
+              delete groqHeaders['HTTP-Referer'];
+              delete groqHeaders['X-Title'];
+
+              _log(`[Groq Interceptor] Routing model ${body.model} -> ${groqModel} on Groq Cloud`);
+              
+              const response = await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
+                ...options,
+                headers: groqHeaders,
+                body: JSON.stringify(groqBody)
+              });
+              
+              if (response.ok) {
+                return response;
+              }
+              
+              const errText = await response.clone().text().catch(() => '');
+              _warn(`[Groq Interceptor] Groq returned error, falling back to OpenRouter:`, errText);
+            } catch (e) {
+              _warn(`[Groq Interceptor] Failed to route to Groq, falling back to OpenRouter:`, e.message);
+            }
+          }
+        } catch (_) {}
       }
       
       // Fallback/Default path: native fetch to OpenRouter
@@ -12189,7 +12259,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Whitelist of allowed state keys — prevents injected localStorage
     // keys from polluting application state
     const STATE_KEYS = new Set([
-      'apiKey', 'groqApiKey', 'orOAuthConnected', 'model', 'persona',
+      'apiKey', 'groqApiKey', 'githubApiKey', 'orOAuthConnected', 'model', 'persona',
       'customSystemPrompt', 'customSystemPromptEnabled',
       'conversations', 'currentId', 'noLogMode', 'sidebarOpen',
       'autoRetry', 'parseltongue', 'parseltongueTier', 'maxRetries',
@@ -12241,6 +12311,21 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       } else if (state.groqApiKey) {
         encryptApiKey(state.groqApiKey).then(enc => {
           localStorage.setItem('g0dm0d3-groqapikey', enc);
+        });
+      }
+
+      // Decrypt GitHub API key asynchronously
+      const encGithubKey = localStorage.getItem('g0dm0d3-githubapikey');
+      if (encGithubKey) {
+        decryptApiKey(encGithubKey).then(plain => {
+          state.githubApiKey = plain;
+          const githubInput = document.getElementById('githubApiKeyInput');
+          if (githubInput) githubInput.value = plain;
+          updateApiWarning();
+        });
+      } else if (state.githubApiKey) {
+        encryptApiKey(state.githubApiKey).then(enc => {
+          localStorage.setItem('g0dm0d3-githubapikey', enc);
         });
       }
       _log('[DEBUG] loadState: final state.ultraplinian =', state.ultraplinian);
@@ -12485,8 +12570,8 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       _saveStateTimer = null;
       _saveStatePending = false;
       enforceDataCaps(); // Cap unbounded arrays before serialization
-      // Strip apiKey and groqApiKey from the main blob — they are stored encrypted separately
-      const { apiKey, groqApiKey, ...stateWithoutKey } = state;
+      // Strip API keys from the main blob — they are stored encrypted separately
+      const { apiKey, groqApiKey, githubApiKey, ...stateWithoutKey } = state;
       const payload = JSON.stringify(stateWithoutKey);
 
       // Persist encrypted keys separately (async, best-effort)
@@ -12494,11 +12579,22 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         encryptApiKey(apiKey).then(enc => {
           try { localStorage.setItem('g0dm0d3-apikey', enc); } catch (_) {}
         });
+      } else {
+        try { localStorage.removeItem('g0dm0d3-apikey'); } catch (_) {}
       }
       if (groqApiKey) {
         encryptApiKey(groqApiKey).then(enc => {
           try { localStorage.setItem('g0dm0d3-groqapikey', enc); } catch (_) {}
         });
+      } else {
+        try { localStorage.removeItem('g0dm0d3-groqapikey'); } catch (_) {}
+      }
+      if (githubApiKey) {
+        encryptApiKey(githubApiKey).then(enc => {
+          try { localStorage.setItem('g0dm0d3-githubapikey', enc); } catch (_) {}
+        });
+      } else {
+        try { localStorage.removeItem('g0dm0d3-githubapikey'); } catch (_) {}
       }
 
       try {
@@ -12664,7 +12760,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     }
 
     function updateApiWarning() {
-      document.getElementById('noApiWarning').style.display = (state.apiKey || state.groqApiKey) ? 'none' : 'flex';
+      document.getElementById('noApiWarning').style.display = (state.apiKey || state.groqApiKey || state.githubApiKey) ? 'none' : 'flex';
     }
 
     // Sidebar
@@ -13403,7 +13499,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Regenerate response from a specific user message
     async function regenerateFromMessage(userMsgIdx) {
       const conv = getCurrentConv();
-      if (!conv || (!state.apiKey && !state.groqApiKey)) return;
+      if (!conv || (!state.apiKey && !state.groqApiKey && !state.githubApiKey)) return;
 
       isStreaming = true;
       updateSendButton();
@@ -14058,7 +14154,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       // Need either text or image
       if ((!content && !attachedImage) || isStreaming) return;
 
-      if (!state.apiKey && !state.groqApiKey) {
+      if (!state.apiKey && !state.groqApiKey && !state.githubApiKey) {
         openSettings();
         return;
       }
@@ -16175,6 +16271,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       // Load values into form
       document.getElementById('apiKeyInput').value = state.apiKey;
       document.getElementById('groqApiKeyInput').value = state.groqApiKey || '';
+      document.getElementById('githubApiKeyInput').value = state.githubApiKey || '';
       updateOAuthUI();
       document.getElementById('defaultModelInput').value = state.model;
       document.getElementById('personaSelect').value = state.persona;
@@ -16333,6 +16430,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       if (newKey !== state.apiKey) state.orOAuthConnected = false;
       state.apiKey = newKey;
       state.groqApiKey = document.getElementById('groqApiKeyInput').value.trim();
+      state.githubApiKey = document.getElementById('githubApiKeyInput').value.trim();
       state.model = document.getElementById('defaultModelInput').value;
       state.persona = document.getElementById('personaSelect').value;
       state.customSystemPromptEnabled = document.getElementById('customSystemPromptEnabled').checked;

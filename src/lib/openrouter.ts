@@ -64,6 +64,7 @@ interface SendMessageOptions {
   model: string
   apiKey: string
   groqApiKey?: string
+  githubApiKey?: string
   noLog?: boolean
   signal?: AbortSignal
   temperature?: number
@@ -103,6 +104,25 @@ function mapToGroqModel(model: string): string {
   return 'llama-3.3-70b-versatile';
 }
 
+function mapToGithubModel(model: string): string {
+  const m = model.toLowerCase();
+  if (m.includes('gpt-4o-mini')) return 'gpt-4o-mini';
+  if (m.includes('gpt-4o')) return 'gpt-4o';
+  if (m.includes('llama-3.1-405b')) return 'meta-llama-3.1-405b-instruct';
+  if (m.includes('llama-3.3-70b')) return 'meta-llama-3.3-70b-instruct';
+  if (m.includes('llama-3.1-8b')) return 'meta-llama-3.1-8b-instruct';
+  if (m.includes('command-r-plus')) return 'cohere-command-r-plus';
+  if (m.includes('mistral-large')) return 'mistral-large-2';
+  if (m.includes('phi-3-medium')) return 'phi-3-medium-128k-instruct';
+  
+  // Fallbacks for general models
+  if (m.includes('claude')) return 'gpt-4o';
+  if (m.includes('grok')) return 'meta-llama-3.1-405b-instruct';
+  if (m.includes('gemini')) return 'gpt-4o-mini';
+  
+  return 'gpt-4o-mini';
+}
+
 /**
  * Send a message to the AI model via OpenRouter (with Groq primary option)
  */
@@ -111,6 +131,7 @@ export async function sendMessage({
   model,
   apiKey,
   groqApiKey,
+  githubApiKey,
   noLog = false,
   signal,
   temperature = 0.7,
@@ -121,7 +142,43 @@ export async function sendMessage({
   presence_penalty,
   repetition_penalty
 }: SendMessageOptions): Promise<string> {
-  // --- PRIMARY OPTION: GROQ ---
+  // --- PRIMARY OPTION: GITHUB MODELS ---
+  if (githubApiKey) {
+    try {
+      const githubModel = mapToGithubModel(model);
+      const githubBody: Record<string, unknown> = {
+        model: githubModel,
+        messages,
+        temperature,
+        max_tokens: Math.min(maxTokens || 4096, 4096)
+      }
+      if (top_p !== undefined) githubBody.top_p = top_p
+
+      const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${githubApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(githubBody),
+        signal
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.choices && data.choices.length > 0) {
+          return data.choices[0].message.content
+        }
+      } else {
+        const err = await response.json().catch(() => ({}))
+        console.warn('GitHub Models query failed, trying Groq/OpenRouter fallback:', err.error?.message || response.statusText)
+      }
+    } catch (e: any) {
+      console.warn('Error during GitHub Models query, trying Groq/OpenRouter fallback:', e.message)
+    }
+  }
+
+  // --- SECONDARY OPTION: GROQ ---
   if (groqApiKey) {
     try {
       const groqModel = mapToGroqModel(model);

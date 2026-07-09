@@ -49,7 +49,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ['https://fonts.gstatic.com'],
-      connectSrc: ["'self'", 'https://openrouter.ai', 'https://*.openrouter.ai', 'https://api.groq.com', 'https://*.groq.com', 'https://*.huggingface.co'],
+      connectSrc: ["'self'", 'https://openrouter.ai', 'https://*.openrouter.ai', 'https://api.groq.com', 'https://*.groq.com', 'https://models.inference.ai.azure.com', 'https://*.huggingface.co'],
       imgSrc: ["'self'", 'data:', 'blob:'],
       baseUri: ["'none'"],
       formAction: ["'none'"],

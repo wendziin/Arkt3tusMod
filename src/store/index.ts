@@ -100,6 +100,7 @@ export interface AppState {
   theme: Theme
   apiKey: string
   groqApiKey: string
+  githubApiKey: string
   defaultModel: string
   conversations: Conversation[]
   currentConversationId: string | null
@@ -182,7 +183,8 @@ export interface AppState {
   // Actions
   setTheme: (theme: Theme) => void
   setApiKey: (key: string) => void
-  setGroqApiKey: (key: string) => void
+  setGroqApiKey: (groqApiKey: string) => void
+  setGithubApiKey: (githubApiKey: string) => void
   setDefaultModel: (model: string) => void
   setShowSettings: (show: boolean) => void
   setShowMagic: (show: boolean) => void
@@ -354,7 +356,8 @@ export const useStore = create<AppState>()(
       theme: 'matrix',
       apiKey: '',
       groqApiKey: '',
-      defaultModel: 'anthropic/claude-opus-4.6',
+      githubApiKey: '',
+      defaultModel: 'anthropic/claude-3.5-sonnet',
       conversations: [],
       currentConversationId: null,
       isHydrated: false,
@@ -430,6 +433,7 @@ export const useStore = create<AppState>()(
       setTheme: (theme) => set({ theme }),
       setApiKey: (apiKey) => set({ apiKey }),
       setGroqApiKey: (groqApiKey) => set({ groqApiKey }),
+      setGithubApiKey: (githubApiKey) => set({ githubApiKey }),
       setDefaultModel: (defaultModel) => set({ defaultModel }),
       setShowSettings: (showSettings) => set({ showSettings }),
       setShowMagic: (showMagic) => set({ showMagic }),
@@ -721,7 +725,7 @@ export const useStore = create<AppState>()(
         // stmModules excluded: transformer functions can't be serialized/deserialized
         const allowed = [
           'conversations', 'currentConversationId', 'theme', 'defaultModel',
-          'currentPersona', 'apiKey', 'groqApiKey', 'autoTuneEnabled', 'autoTuneStrategy',
+          'currentPersona', 'apiKey', 'groqApiKey', 'githubApiKey', 'autoTuneEnabled', 'autoTuneStrategy',
           'autoTuneOverrides', 'feedbackState', 'parseltongueConfig',
           'memories', 'memoriesEnabled', 'customSystemPrompt', 'useCustomSystemPrompt',
           'consortiumEnabled', 'consortiumTier', 'liquidResponseEnabled', 'liquidMinDelta',
@@ -744,6 +748,7 @@ export const useStore = create<AppState>()(
         showMagic: state.showMagic,
         apiKey: state.apiKey,
         groqApiKey: state.groqApiKey,
+        githubApiKey: state.githubApiKey,
         defaultModel: state.defaultModel,
         conversations: state.conversations,
         currentConversationId: state.currentConversationId,

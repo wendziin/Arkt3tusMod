@@ -212,7 +212,7 @@ function TabButton({
 }
 
 function APIKeyTab() {
-  const { apiKey, setApiKey, groqApiKey, setGroqApiKey } = useStore()
+  const { apiKey, setApiKey, groqApiKey, setGroqApiKey, githubApiKey, setGithubApiKey } = useStore()
   const [showKey, setShowKey] = useState(false)
   const [localKey, setLocalKey] = useState(apiKey)
   const [saved, setSaved] = useState(false)
@@ -220,6 +220,10 @@ function APIKeyTab() {
   const [showGroqKey, setShowGroqKey] = useState(false)
   const [localGroqKey, setLocalGroqKey] = useState(groqApiKey)
   const [groqSaved, setGroqSaved] = useState(false)
+
+  const [showGithubKey, setShowGithubKey] = useState(false)
+  const [localGithubKey, setLocalGithubKey] = useState(githubApiKey)
+  const [githubSaved, setGithubSaved] = useState(false)
 
   const handleBlur = () => {
     if (localKey !== apiKey) {
@@ -234,6 +238,14 @@ function APIKeyTab() {
       setGroqApiKey(localGroqKey)
       setGroqSaved(true)
       setTimeout(() => setGroqSaved(false), 2000)
+    }
+  }
+
+  const handleGithubBlur = () => {
+    if (localGithubKey !== githubApiKey) {
+      setGithubApiKey(localGithubKey)
+      setGithubSaved(true)
+      setTimeout(() => setGithubSaved(false), 2000)
     }
   }
 
@@ -280,6 +292,52 @@ function APIKeyTab() {
               aria-label={showGroqKey ? 'Hide key' : 'Show key'}
             >
               {showGroqKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* GitHub Models API Key (Alternative Option) */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">GitHub Models Token (Alternative Option)</h3>
+          <p className="text-sm theme-secondary mb-4">
+            If configured, queries will be routed directly through GitHub Models (100% free premium model hosting).
+            Get your PAT at{' '}
+            <a
+              href="https://github.com/settings/tokens"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="theme-primary underline"
+            >
+              github.com/settings/tokens
+            </a>
+          </p>
+        </div>
+
+        <div className="relative">
+          <input
+            type={showGithubKey ? 'text' : 'password'}
+            value={localGithubKey}
+            onChange={(e) => setLocalGithubKey(e.target.value)}
+            onBlur={handleGithubBlur}
+            placeholder="ghp_..."
+            className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
+              focus:outline-none focus:glow-box"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            {githubSaved && (
+              <span className="flex items-center gap-1 text-xs text-green-500">
+                <Check className="w-3 h-3" />
+                Saved
+              </span>
+            )}
+            <button
+              onClick={() => setShowGithubKey(!showGithubKey)}
+              className="p-1 hover:theme-primary transition-colors"
+              aria-label={showGithubKey ? 'Hide key' : 'Show key'}
+            >
+              {showGithubKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
