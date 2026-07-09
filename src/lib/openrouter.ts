@@ -63,6 +63,7 @@ interface SendMessageOptions {
   messages: Message[]
   model: string
   apiKey: string
+  groqApiKey?: string
   noLog?: boolean
   signal?: AbortSignal
   temperature?: number
@@ -91,13 +92,25 @@ interface OpenRouterResponse {
   }
 }
 
+function mapToGroqModel(model: string): string {
+  const modelLower = model.toLowerCase();
+  if (modelLower.includes('claude') || modelLower.includes('grok-3') || modelLower.includes('gpt-4') || modelLower.includes('4o')) {
+    return 'llama-3.3-70b-versatile';
+  }
+  if (modelLower.includes('gemini') || modelLower.includes('flash')) {
+    return 'llama-3.1-8b-instant';
+  }
+  return 'llama-3.3-70b-versatile';
+}
+
 /**
- * Send a message to the AI model via OpenRouter
+ * Send a message to the AI model via OpenRouter (with Groq primary option)
  */
 export async function sendMessage({
   messages,
   model,
   apiKey,
+  groqApiKey,
   noLog = false,
   signal,
   temperature = 0.7,
@@ -108,6 +121,47 @@ export async function sendMessage({
   presence_penalty,
   repetition_penalty
 }: SendMessageOptions): Promise<string> {
+  // --- PRIMARY OPTION: GROQ ---
+  if (groqApiKey) {
+    try {
+      const groqModel = mapToGroqModel(model);
+      const groqBody: Record<string, unknown> = {
+        model: groqModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens
+      }
+      if (top_p !== undefined) groqBody.top_p = top_p
+      if (top_k !== undefined) groqBody.top_k = top_k
+      if (frequency_penalty !== undefined) groqBody.frequency_penalty = frequency_penalty
+      if (presence_penalty !== undefined) groqBody.presence_penalty = presence_penalty
+      if (repetition_penalty !== undefined) groqBody.repetition_penalty = repetition_penalty
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(groqBody),
+        signal
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.choices && data.choices.length > 0) {
+          return data.choices[0].message.content
+        }
+      } else {
+        const err = await response.json().catch(() => ({}))
+        console.warn('Groq query failed, falling back to OpenRouter:', err.error?.message || response.statusText)
+      }
+    } catch (e: any) {
+      console.warn('Error during Groq query, falling back to OpenRouter:', e.message)
+    }
+  }
+
+  // --- SECONDARY OPTION: OPENROUTER ---
   if (!apiKey) {
     throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }

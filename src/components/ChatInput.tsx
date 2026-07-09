@@ -19,6 +19,7 @@ export function ChatInput() {
     addMessage,
     updateMessageContent,
     apiKey,
+    groqApiKey,
     isStreaming,
     setIsStreaming,
     personas,
@@ -473,6 +474,7 @@ export function ChatInput() {
               messages,
               model,
               apiKey,
+              groqApiKey,
               noLog: noLogMode,
               signal: abortControllerRef.current.signal,
               ...(tuneResult ? {

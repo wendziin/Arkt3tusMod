@@ -212,10 +212,14 @@ function TabButton({
 }
 
 function APIKeyTab() {
-  const { apiKey, setApiKey } = useStore()
+  const { apiKey, setApiKey, groqApiKey, setGroqApiKey } = useStore()
   const [showKey, setShowKey] = useState(false)
   const [localKey, setLocalKey] = useState(apiKey)
   const [saved, setSaved] = useState(false)
+
+  const [showGroqKey, setShowGroqKey] = useState(false)
+  const [localGroqKey, setLocalGroqKey] = useState(groqApiKey)
+  const [groqSaved, setGroqSaved] = useState(false)
 
   const handleBlur = () => {
     if (localKey !== apiKey) {
@@ -225,52 +229,111 @@ function APIKeyTab() {
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">OpenRouter API Key</h3>
-        <p className="text-sm theme-secondary mb-4">
-          Your API key is stored locally and never sent to G0DM0D3 servers.
-          Get your key at{' '}
-          <a
-            href="https://openrouter.ai/keys"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="theme-primary underline"
-          >
-            openrouter.ai
-          </a>
-        </p>
-      </div>
+  const handleGroqBlur = () => {
+    if (localGroqKey !== groqApiKey) {
+      setGroqApiKey(localGroqKey)
+      setGroqSaved(true)
+      setTimeout(() => setGroqSaved(false), 2000)
+    }
+  }
 
-      <div className="relative">
-        <input
-          type={showKey ? 'text' : 'password'}
-          value={localKey}
-          onChange={(e) => setLocalKey(e.target.value)}
-          onBlur={handleBlur}
-          placeholder="sk-or-v1-..."
-          className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
-            focus:outline-none focus:glow-box"
-        />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          {saved && (
-            <span className="flex items-center gap-1 text-xs text-green-500">
-              <Check className="w-3 h-3" />
-              Saved
-            </span>
-          )}
-          <button
-            onClick={() => setShowKey(!showKey)}
-            className="p-1 hover:theme-primary transition-colors"
-            aria-label={showKey ? 'Hide key' : 'Show key'}
-          >
-            {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+  return (
+    <div className="space-y-6">
+      {/* Groq API Key (Primary Option) */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Groq API Key (Primary Option)</h3>
+          <p className="text-sm theme-secondary mb-4">
+            If configured, queries will be routed directly through Groq (100% free, high-speed Llama 3.3).
+            Get your key at{' '}
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="theme-primary underline"
+            >
+              console.groq.com
+            </a>
+          </p>
+        </div>
+
+        <div className="relative">
+          <input
+            type={showGroqKey ? 'text' : 'password'}
+            value={localGroqKey}
+            onChange={(e) => setLocalGroqKey(e.target.value)}
+            onBlur={handleGroqBlur}
+            placeholder="gsk_..."
+            className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
+              focus:outline-none focus:glow-box"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            {groqSaved && (
+              <span className="flex items-center gap-1 text-xs text-green-500">
+                <Check className="w-3 h-3" />
+                Saved
+              </span>
+            )}
+            <button
+              onClick={() => setShowGroqKey(!showGroqKey)}
+              className="p-1 hover:theme-primary transition-colors"
+              aria-label={showGroqKey ? 'Hide key' : 'Show key'}
+            >
+              {showGroqKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
 
-      <p className="text-xs theme-secondary">
+      <hr className="border-theme-primary opacity-20" />
+
+      {/* OpenRouter API Key (Secondary/Fallback) */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">OpenRouter API Key (Secondary/Fallback)</h3>
+          <p className="text-sm theme-secondary mb-4">
+            Used as a secondary option if the Groq query fails, or as the main option if no Groq key is set.
+            Get your key at{' '}
+            <a
+              href="https://openrouter.ai/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="theme-primary underline"
+            >
+              openrouter.ai
+            </a>
+          </p>
+        </div>
+
+        <div className="relative">
+          <input
+            type={showKey ? 'text' : 'password'}
+            value={localKey}
+            onChange={(e) => setLocalKey(e.target.value)}
+            onBlur={handleBlur}
+            placeholder="sk-or-v1-..."
+            className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
+              focus:outline-none focus:glow-box"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            {saved && (
+              <span className="flex items-center gap-1 text-xs text-green-500">
+                <Check className="w-3 h-3" />
+                Saved
+              </span>
+            )}
+            <button
+              onClick={() => setShowKey(!showKey)}
+              className="p-1 hover:theme-primary transition-colors"
+              aria-label={showKey ? 'Hide key' : 'Show key'}
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs theme-secondary text-right">
         Changes are saved automatically when you click away.
       </p>
     </div>
