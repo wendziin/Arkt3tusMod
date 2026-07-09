@@ -4496,7 +4496,7 @@ RESPOND WITH EXACTLY ONE LINE. No explanation, no preamble.`;
         regexFallback.confidence = 0.6;
       }
 
-      if (!state.apiKey) return regexFallback;
+      if (!state.apiKey && !state.groqApiKey) return regexFallback;
 
       try {
         const controller = new AbortController();
@@ -12559,7 +12559,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     }
 
     function updateApiWarning() {
-      document.getElementById('noApiWarning').style.display = state.apiKey ? 'none' : 'flex';
+      document.getElementById('noApiWarning').style.display = (state.apiKey || state.groqApiKey) ? 'none' : 'flex';
     }
 
     // Sidebar
@@ -13298,7 +13298,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Regenerate response from a specific user message
     async function regenerateFromMessage(userMsgIdx) {
       const conv = getCurrentConv();
-      if (!conv || !state.apiKey) return;
+      if (!conv || (!state.apiKey && !state.groqApiKey)) return;
 
       isStreaming = true;
       updateSendButton();
@@ -13953,7 +13953,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       // Need either text or image
       if ((!content && !attachedImage) || isStreaming) return;
 
-      if (!state.apiKey) {
+      if (!state.apiKey && !state.groqApiKey) {
         openSettings();
         return;
       }
