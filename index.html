@@ -4047,7 +4047,16 @@
         <!-- API Keys Tab -->
         <div class="settings-panel" id="panel-api">
           <div class="settings-section">
-            <div class="settings-section-title">OpenRouter API</div>
+            <div class="settings-section-title">Groq API (Primary Option)</div>
+            <div class="form-group">
+              <label>Groq API Key</label>
+              <input type="password" id="groqApiKeyInput" placeholder="gsk_...">
+              <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Stored in your browser's localStorage only. If configured, queries run on Groq.</span>
+              <a href="https://console.groq.com/keys" target="_blank" class="api-key-link">Get your free key at Groq →</a>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-title">OpenRouter API (Secondary / Fallback)</div>
             <div class="form-group">
               <button id="orLoginBtn" class="or-login-btn" onclick="startOpenRouterLogin()">
                 <span class="or-icon">OR</span>
@@ -4191,6 +4200,7 @@
     // State
     let state = {
       apiKey: '',
+      groqApiKey: '',
       orOAuthConnected: false,
       model: 'anthropic/claude-opus-4.6',
       persona: 'godmode',
@@ -4233,6 +4243,69 @@
       autoTuneLastParams: null,      // Last computed parameters
       // Universal counters
       promptsTried: 0               // Total prompts sent across all sessions
+    };
+
+    // Global fetch interceptor for Groq primary with OpenRouter fallback
+    const nativeFetch = window.fetch;
+    window.fetch = async function(url, options) {
+      if (typeof url === 'string' && url.includes('openrouter.ai/api/v1/chat/completions') && state.groqApiKey) {
+        try {
+          const body = JSON.parse(options.body);
+          
+          // Map model to Groq-supported model
+          const mapToGroqModel = (model) => {
+            const m = (model || '').toLowerCase();
+            if (m.includes('claude') || m.includes('grok-3') || m.includes('gpt-4') || m.includes('4o')) {
+              return 'llama-3.3-70b-versatile';
+            }
+            if (m.includes('gemini') || m.includes('flash')) {
+              return 'llama-3.1-8b-instant';
+            }
+            return 'llama-3.3-70b-versatile';
+          };
+          
+          const groqModel = mapToGroqModel(body.model);
+          const groqBody = {
+            model: groqModel,
+            messages: body.messages,
+            temperature: body.temperature,
+            max_tokens: body.max_tokens || 4096,
+            top_p: body.top_p,
+            top_k: body.top_k,
+            frequency_penalty: body.frequency_penalty,
+            presence_penalty: body.presence_penalty,
+            repetition_penalty: body.repetition_penalty
+          };
+          
+          const groqHeaders = {
+            ...options.headers,
+            'Authorization': `Bearer ${state.groqApiKey}`,
+            'Content-Type': 'application/json'
+          };
+          delete groqHeaders['HTTP-Referer'];
+          delete groqHeaders['X-Title'];
+
+          _log(`[Groq Interceptor] Routing model ${body.model} -> ${groqModel} on Groq Cloud`);
+          
+          const response = await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
+            ...options,
+            headers: groqHeaders,
+            body: JSON.stringify(groqBody)
+          });
+          
+          if (response.ok) {
+            return response;
+          }
+          
+          const errText = await response.clone().text().catch(() => '');
+          _warn(`[Groq Interceptor] Groq returned error, falling back to OpenRouter:`, errText);
+        } catch (e) {
+          _warn(`[Groq Interceptor] Failed to route to Groq, falling back to OpenRouter:`, e.message);
+        }
+      }
+      
+      // Fallback/Default path: native fetch to OpenRouter
+      return nativeFetch(url, options);
     };
 
     let isStreaming = false;
@@ -12011,7 +12084,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Whitelist of allowed state keys — prevents injected localStorage
     // keys from polluting application state
     const STATE_KEYS = new Set([
-      'apiKey', 'orOAuthConnected', 'model', 'persona',
+      'apiKey', 'groqApiKey', 'orOAuthConnected', 'model', 'persona',
       'customSystemPrompt', 'customSystemPromptEnabled',
       'conversations', 'currentId', 'noLogMode', 'sidebarOpen',
       'autoRetry', 'parseltongue', 'parseltongueTier', 'maxRetries',
@@ -12049,6 +12122,20 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         // Migrate: old plaintext key found in state blob → encrypt it
         encryptApiKey(state.apiKey).then(enc => {
           localStorage.setItem('g0dm0d3-apikey', enc);
+        });
+      }
+
+      // Decrypt Groq API key asynchronously
+      const encGroqKey = localStorage.getItem('g0dm0d3-groqapikey');
+      if (encGroqKey) {
+        decryptApiKey(encGroqKey).then(plain => {
+          state.groqApiKey = plain;
+          const groqInput = document.getElementById('groqApiKeyInput');
+          if (groqInput) groqInput.value = plain;
+        });
+      } else if (state.groqApiKey) {
+        encryptApiKey(state.groqApiKey).then(enc => {
+          localStorage.setItem('g0dm0d3-groqapikey', enc);
         });
       }
       _log('[DEBUG] loadState: final state.ultraplinian =', state.ultraplinian);
@@ -12293,14 +12380,19 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       _saveStateTimer = null;
       _saveStatePending = false;
       enforceDataCaps(); // Cap unbounded arrays before serialization
-      // Strip apiKey from the main blob — it's stored encrypted separately
-      const { apiKey, ...stateWithoutKey } = state;
+      // Strip apiKey and groqApiKey from the main blob — they are stored encrypted separately
+      const { apiKey, groqApiKey, ...stateWithoutKey } = state;
       const payload = JSON.stringify(stateWithoutKey);
 
-      // Persist encrypted key separately (async, best-effort)
+      // Persist encrypted keys separately (async, best-effort)
       if (apiKey) {
         encryptApiKey(apiKey).then(enc => {
           try { localStorage.setItem('g0dm0d3-apikey', enc); } catch (_) {}
+        });
+      }
+      if (groqApiKey) {
+        encryptApiKey(groqApiKey).then(enc => {
+          try { localStorage.setItem('g0dm0d3-groqapikey', enc); } catch (_) {}
         });
       }
 
@@ -15977,6 +16069,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     function openSettings() {
       // Load values into form
       document.getElementById('apiKeyInput').value = state.apiKey;
+      document.getElementById('groqApiKeyInput').value = state.groqApiKey || '';
       updateOAuthUI();
       document.getElementById('defaultModelInput').value = state.model;
       document.getElementById('personaSelect').value = state.persona;
@@ -16134,6 +16227,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       // If user manually changed the key, clear OAuth connected state
       if (newKey !== state.apiKey) state.orOAuthConnected = false;
       state.apiKey = newKey;
+      state.groqApiKey = document.getElementById('groqApiKeyInput').value.trim();
       state.model = document.getElementById('defaultModelInput').value;
       state.persona = document.getElementById('personaSelect').value;
       state.customSystemPromptEnabled = document.getElementById('customSystemPromptEnabled').checked;
