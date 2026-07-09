@@ -65,6 +65,7 @@ interface SendMessageOptions {
   apiKey: string
   groqApiKey?: string
   githubApiKey?: string
+  preferredProvider?: 'auto' | 'github' | 'groq' | 'openrouter'
   noLog?: boolean
   signal?: AbortSignal
   temperature?: number
@@ -142,8 +143,10 @@ export async function sendMessage({
   presence_penalty,
   repetition_penalty
 }: SendMessageOptions): Promise<string> {
-  // --- PRIMARY OPTION: GITHUB MODELS ---
-  if (githubApiKey) {
+  const pref = preferredProvider || 'auto';
+
+  const tryGithub = async (): Promise<string | null> => {
+    if (!githubApiKey) return null;
     try {
       const githubModel = mapToGithubModel(model);
       const githubBody: Record<string, unknown> = {
@@ -171,15 +174,16 @@ export async function sendMessage({
         }
       } else {
         const err = await response.json().catch(() => ({}))
-        console.warn('GitHub Models query failed, trying Groq/OpenRouter fallback:', err.error?.message || response.statusText)
+        console.warn('GitHub Models query failed:', err.error?.message || response.statusText)
       }
     } catch (e: any) {
-      console.warn('Error during GitHub Models query, trying Groq/OpenRouter fallback:', e.message)
+      console.warn('Error during GitHub Models query:', e.message)
     }
+    return null;
   }
 
-  // --- SECONDARY OPTION: GROQ ---
-  if (groqApiKey) {
+  const tryGroq = async (): Promise<string | null> => {
+    if (!groqApiKey) return null;
     try {
       const groqModel = mapToGroqModel(model);
       const groqBody: Record<string, unknown> = {
@@ -211,11 +215,32 @@ export async function sendMessage({
         }
       } else {
         const err = await response.json().catch(() => ({}))
-        console.warn('Groq query failed, falling back to OpenRouter:', err.error?.message || response.statusText)
+        console.warn('Groq query failed:', err.error?.message || response.statusText)
       }
     } catch (e: any) {
-      console.warn('Error during Groq query, falling back to OpenRouter:', e.message)
+      console.warn('Error during Groq query:', e.message)
     }
+    return null;
+  }
+
+  // Execute routing priority
+  if (pref === 'github') {
+    const res = await tryGithub();
+    if (res !== null) return res;
+    const res2 = await tryGroq();
+    if (res2 !== null) return res2;
+  } else if (pref === 'groq') {
+    const res = await tryGroq();
+    if (res !== null) return res;
+    const res2 = await tryGithub();
+    if (res2 !== null) return res2;
+  } else if (pref === 'auto') {
+    const res = await tryGithub();
+    if (res !== null) return res;
+    const res2 = await tryGroq();
+    if (res2 !== null) return res2;
+  } else if (pref === 'openrouter') {
+    // Force OpenRouter (do nothing, falls back below)
   }
 
   // --- SECONDARY OPTION: OPENROUTER ---

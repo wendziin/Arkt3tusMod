@@ -101,6 +101,7 @@ export interface AppState {
   apiKey: string
   groqApiKey: string
   githubApiKey: string
+  preferredProvider: 'auto' | 'github' | 'groq' | 'openrouter'
   defaultModel: string
   conversations: Conversation[]
   currentConversationId: string | null
@@ -185,6 +186,7 @@ export interface AppState {
   setApiKey: (key: string) => void
   setGroqApiKey: (groqApiKey: string) => void
   setGithubApiKey: (githubApiKey: string) => void
+  setPreferredProvider: (provider: 'auto' | 'github' | 'groq' | 'openrouter') => void
   setDefaultModel: (model: string) => void
   setShowSettings: (show: boolean) => void
   setShowMagic: (show: boolean) => void
@@ -357,6 +359,7 @@ export const useStore = create<AppState>()(
       apiKey: '',
       groqApiKey: '',
       githubApiKey: '',
+      preferredProvider: 'auto',
       defaultModel: 'anthropic/claude-3.5-sonnet',
       conversations: [],
       currentConversationId: null,
@@ -434,6 +437,7 @@ export const useStore = create<AppState>()(
       setApiKey: (apiKey) => set({ apiKey }),
       setGroqApiKey: (groqApiKey) => set({ groqApiKey }),
       setGithubApiKey: (githubApiKey) => set({ githubApiKey }),
+      setPreferredProvider: (preferredProvider) => set({ preferredProvider }),
       setDefaultModel: (defaultModel) => set({ defaultModel }),
       setShowSettings: (showSettings) => set({ showSettings }),
       setShowMagic: (showMagic) => set({ showMagic }),
@@ -725,7 +729,7 @@ export const useStore = create<AppState>()(
         // stmModules excluded: transformer functions can't be serialized/deserialized
         const allowed = [
           'conversations', 'currentConversationId', 'theme', 'defaultModel',
-          'currentPersona', 'apiKey', 'groqApiKey', 'githubApiKey', 'autoTuneEnabled', 'autoTuneStrategy',
+          'currentPersona', 'apiKey', 'groqApiKey', 'githubApiKey', 'preferredProvider', 'autoTuneEnabled', 'autoTuneStrategy',
           'autoTuneOverrides', 'feedbackState', 'parseltongueConfig',
           'memories', 'memoriesEnabled', 'customSystemPrompt', 'useCustomSystemPrompt',
           'consortiumEnabled', 'consortiumTier', 'liquidResponseEnabled', 'liquidMinDelta',
@@ -749,6 +753,7 @@ export const useStore = create<AppState>()(
         apiKey: state.apiKey,
         groqApiKey: state.groqApiKey,
         githubApiKey: state.githubApiKey,
+        preferredProvider: state.preferredProvider,
         defaultModel: state.defaultModel,
         conversations: state.conversations,
         currentConversationId: state.currentConversationId,

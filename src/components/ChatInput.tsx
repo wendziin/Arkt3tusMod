@@ -21,6 +21,7 @@ export function ChatInput() {
     apiKey,
     groqApiKey,
     githubApiKey,
+    preferredProvider,
     isStreaming,
     setIsStreaming,
     personas,
@@ -477,6 +478,7 @@ export function ChatInput() {
               apiKey,
               groqApiKey,
               githubApiKey,
+              preferredProvider,
               noLog: noLogMode,
               signal: abortControllerRef.current.signal,
               ...(tuneResult ? {

@@ -212,7 +212,7 @@ function TabButton({
 }
 
 function APIKeyTab() {
-  const { apiKey, setApiKey, groqApiKey, setGroqApiKey, githubApiKey, setGithubApiKey } = useStore()
+  const { apiKey, setApiKey, groqApiKey, setGroqApiKey, githubApiKey, setGithubApiKey, preferredProvider, setPreferredProvider } = useStore()
   const [showKey, setShowKey] = useState(false)
   const [localKey, setLocalKey] = useState(apiKey)
   const [saved, setSaved] = useState(false)
@@ -341,6 +341,28 @@ function APIKeyTab() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Preferred API Provider */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Preferred API Provider</h3>
+          <p className="text-sm theme-secondary mb-4">
+            Select which provider to query first when multiple keys are configured.
+          </p>
+        </div>
+
+        <select
+          value={preferredProvider}
+          onChange={(e) => setPreferredProvider(e.target.value as any)}
+          className="w-full px-4 py-3 bg-theme-dim border border-theme-primary rounded-lg
+            focus:outline-none focus:glow-box"
+        >
+          <option value="auto">Auto-Priority (GitHub Models ➔ Groq ➔ OpenRouter)</option>
+          <option value="github">Force GitHub Models (Free Premium Models)</option>
+          <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
+          <option value="openrouter">Force OpenRouter (Requires OpenRouter Key)</option>
+        </select>
       </div>
 
       <hr className="border-theme-primary opacity-20" />

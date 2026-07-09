@@ -4147,6 +4147,19 @@
             </div>
           </div>
           <div class="settings-section">
+            <div class="settings-section-title">Preferred API Provider</div>
+            <div class="form-group">
+              <label>Default Routing Priority</label>
+              <select id="preferredProviderSelect" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff;">
+                <option value="auto">Auto-Priority (GitHub Models ➔ Groq ➔ OpenRouter)</option>
+                <option value="github">Force GitHub Models (Free Premium Models)</option>
+                <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
+                <option value="openrouter">Force OpenRouter (Requires OpenRouter Key)</option>
+              </select>
+              <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Prioritize which provider is queried first when multiple keys are configured.</span>
+            </div>
+          </div>
+          <div class="settings-section">
             <div class="settings-section-title">OpenRouter API (Secondary / Fallback)</div>
             <div class="form-group">
               <button id="orLoginBtn" class="or-login-btn" onclick="startOpenRouterLogin()">
@@ -4308,11 +4321,34 @@
     const _log = G0D_DEBUG ? console.log.bind(console) : () => {};
     const _warn = G0D_DEBUG ? console.warn.bind(console) : () => {};
 
+    function showProviderToast(providerName) {
+      const existing = document.getElementById('providerToast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'providerToast';
+      toast.innerHTML = `📡 Routing via <strong style="color:#00ff88;text-shadow:0 0 5px #00ff88;">${providerName}</strong>`;
+      toast.style.cssText = `
+        position:fixed;bottom:20px;right:20px;
+        padding:12px 24px;background:rgba(0,0,0,0.85);border:2px solid var(--primary, #00ff88);
+        border-radius:8px;color:#fff;font-family:'JetBrains Mono',monospace;
+        font-size:12px;z-index:10000;box-shadow:0 0 20px rgba(0, 255, 136, 0.4);
+        pointer-events:none;
+        transition: opacity 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
     // State
     let state = {
       apiKey: '',
       groqApiKey: '',
       githubApiKey: '',
+      preferredProvider: 'auto',
       orOAuthConnected: false,
       model: 'anthropic/claude-opus-4.6',
       persona: 'godmode',
@@ -4366,9 +4402,11 @@
 
           const hasGithub = state.githubApiKey && state.githubApiKey !== 'undefined' && state.githubApiKey !== 'null' && state.githubApiKey.trim() !== '' && !state.githubApiKey.startsWith('enc:');
           const hasGroq = state.groqApiKey && state.groqApiKey !== 'undefined' && state.groqApiKey !== 'null' && state.groqApiKey.trim() !== '' && !state.groqApiKey.startsWith('enc:');
+          const pref = state.preferredProvider || 'auto';
 
-          // 1. Try GitHub Models if configured
-          if (hasGithub) {
+          // Helper: Try GitHub Models
+          const tryGithub = async () => {
+            if (!hasGithub) return null;
             if (typeof addThinkingLog === 'function') {
               addThinkingLog(`[GitHub Models] Intercepting: ${body.model}...`, 'info');
             }
@@ -4418,6 +4456,9 @@
                 if (typeof addThinkingLog === 'function') {
                   addThinkingLog(`[GitHub Models] SUCCESS: ${githubModel}`, 'success');
                 }
+                if (typeof showProviderToast === 'function') {
+                  showProviderToast('GitHub Models');
+                }
                 return response;
               }
 
@@ -4432,10 +4473,12 @@
               }
               _warn(`[GitHub Models Interceptor] Failed to route to GitHub Models:`, e.message);
             }
-          }
+            return null;
+          };
 
-          // 2. Try Groq if configured
-          if (hasGroq) {
+          // Helper: Try Groq
+          const tryGroq = async () => {
+            if (!hasGroq) return null;
             if (typeof addThinkingLog === 'function') {
               addThinkingLog(`[Groq] Intercepting: ${body.model}...`, 'info');
             }
@@ -4485,6 +4528,9 @@
                 if (typeof addThinkingLog === 'function') {
                   addThinkingLog(`[Groq] SUCCESS: ${groqModel}`, 'success');
                 }
+                if (typeof showProviderToast === 'function') {
+                  showProviderToast('Groq Cloud');
+                }
                 return response;
               }
               
@@ -4499,11 +4545,35 @@
               }
               _warn(`[Groq Interceptor] Failed to route to Groq, falling back to OpenRouter:`, e.message);
             }
+            return null;
+          };
+
+          // Execute routing priority
+          if (pref === 'github') {
+            const resp = await tryGithub();
+            if (resp) return resp;
+            const resp2 = await tryGroq();
+            if (resp2) return resp2;
+          } else if (pref === 'groq') {
+            const resp = await tryGroq();
+            if (resp) return resp;
+            const resp2 = await tryGithub();
+            if (resp2) return resp2;
+          } else if (pref === 'auto') {
+            const resp = await tryGithub();
+            if (resp) return resp;
+            const resp2 = await tryGroq();
+            if (resp2) return resp2;
+          } else if (pref === 'openrouter') {
+            // Force OpenRouter (do nothing, fallback executes below)
           }
         } catch (_) {}
       }
       
       // Fallback/Default path: native fetch to OpenRouter
+      if (typeof showProviderToast === 'function') {
+        showProviderToast('OpenRouter');
+      }
       return nativeFetch(url, options);
     };
 
@@ -12286,7 +12356,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Whitelist of allowed state keys — prevents injected localStorage
     // keys from polluting application state
     const STATE_KEYS = new Set([
-      'apiKey', 'groqApiKey', 'githubApiKey', 'orOAuthConnected', 'model', 'persona',
+      'apiKey', 'groqApiKey', 'githubApiKey', 'preferredProvider', 'orOAuthConnected', 'model', 'persona',
       'customSystemPrompt', 'customSystemPromptEnabled',
       'conversations', 'currentId', 'noLogMode', 'sidebarOpen',
       'autoRetry', 'parseltongue', 'parseltongueTier', 'maxRetries',
@@ -16316,6 +16386,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       document.getElementById('apiKeyInput').value = state.apiKey;
       document.getElementById('groqApiKeyInput').value = state.groqApiKey || '';
       document.getElementById('githubApiKeyInput').value = state.githubApiKey || '';
+      document.getElementById('preferredProviderSelect').value = state.preferredProvider || 'auto';
       updateOAuthUI();
       document.getElementById('defaultModelInput').value = state.model;
       document.getElementById('personaSelect').value = state.persona;
@@ -16475,6 +16546,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       state.apiKey = newKey;
       state.groqApiKey = document.getElementById('groqApiKeyInput').value.trim();
       state.githubApiKey = document.getElementById('githubApiKeyInput').value.trim();
+      state.preferredProvider = document.getElementById('preferredProviderSelect').value;
       state.model = document.getElementById('defaultModelInput').value;
       state.persona = document.getElementById('personaSelect').value;
       state.customSystemPromptEnabled = document.getElementById('customSystemPromptEnabled').checked;
