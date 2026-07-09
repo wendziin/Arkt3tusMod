@@ -12036,6 +12036,9 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // by XSS or malicious extensions — they'd need to also read the
     // salt and re-derive the key.
     async function _getOrCreateCryptoKey() {
+      if (typeof crypto === 'undefined' || !crypto.subtle || !crypto.getRandomValues) {
+        throw new Error('Web Crypto API not available');
+      }
       const SALT_KEY = 'g0dm0d3-device-salt';
       let saltHex = localStorage.getItem(SALT_KEY);
       if (!saltHex) {
