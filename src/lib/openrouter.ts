@@ -243,7 +243,8 @@ export async function sendMessage({
     // Force OpenRouter (do nothing, falls back below)
   }
 
-  // --- SECONDARY OPTION: OPENROUTER ---
+  // --- SECONDARY OPTION: OPENROUTER (DISABLED) ---
+  /*
   if (!apiKey) {
     throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }
@@ -300,6 +301,8 @@ export async function sendMessage({
   }
 
   return data.choices[0].message.content
+  */
+  throw new Error('OpenRouter is disabled. Please configure GitHub Models or Groq Cloud in Settings.');
 }
 
 /**
@@ -320,6 +323,8 @@ export async function* streamMessage({
   presence_penalty,
   repetition_penalty
 }: SendMessageOptions): AsyncGenerator<string, void, unknown> {
+  // --- STREAM OPENROUTER (DISABLED) ---
+  /*
   if (!apiKey) {
     throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }
@@ -391,12 +396,15 @@ export async function* streamMessage({
   } finally {
     reader.releaseLock()
   }
+  */
+  throw new Error('OpenRouter streaming is disabled. Please configure GitHub Models or Groq Cloud in Settings.');
 }
 
 /**
  * Get available models from OpenRouter
  */
 export async function getModels(apiKey: string): Promise<string[]> {
+  /*
   const response = await fetch('https://openrouter.ai/api/v1/models', {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -411,6 +419,17 @@ export async function getModels(apiKey: string): Promise<string[]> {
 
   const data = await response.json()
   return data.data.map((model: { id: string }) => model.id)
+  */
+  return [
+    'anthropic/claude-3.5-sonnet',
+    'google/gemini-2.5-flash',
+    'google/gemini-2.5-pro',
+    'meta-llama/llama-3.3-70b-instruct',
+    'meta-llama/llama-3.1-8b-instruct',
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
+    'x-ai/grok-2'
+  ];
 }
 
 /**

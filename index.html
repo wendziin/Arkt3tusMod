@@ -4570,11 +4570,27 @@
         } catch (_) {}
       }
       
-      // Fallback/Default path: native fetch to OpenRouter
+      // Fallback/Default path: native fetch to OpenRouter (DISABLED)
+      /*
       if (typeof showProviderToast === 'function') {
         showProviderToast('OpenRouter');
       }
       return nativeFetch(url, options);
+      */
+
+      if (typeof addThinkingLog === 'function') {
+        addThinkingLog(`[OpenRouter] Call aborted: OpenRouter is disabled.`, 'fail');
+      }
+      return new Response(JSON.stringify({
+        error: {
+          message: "OpenRouter is disabled. Please configure GitHub Models or Groq Cloud in Settings.",
+          code: 403
+        }
+      }), {
+        status: 403,
+        statusText: "Forbidden",
+        headers: { "Content-Type": "application/json" }
+      });
     };
 
     let isStreaming = false;
