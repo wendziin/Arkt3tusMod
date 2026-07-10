@@ -227,20 +227,14 @@ export async function sendMessage({
   if (pref === 'github') {
     const res = await tryGithub();
     if (res !== null) return res;
-    const res2 = await tryGroq();
-    if (res2 !== null) return res2;
   } else if (pref === 'groq') {
     const res = await tryGroq();
     if (res !== null) return res;
-    const res2 = await tryGithub();
-    if (res2 !== null) return res2;
-  } else if (pref === 'auto') {
+  } else { // 'auto'
     const res = await tryGithub();
     if (res !== null) return res;
     const res2 = await tryGroq();
     if (res2 !== null) return res2;
-  } else if (pref === 'openrouter') {
-    // Force OpenRouter (do nothing, falls back below)
   }
 
   // --- SECONDARY OPTION: OPENROUTER (DISABLED) ---

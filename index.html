@@ -4151,15 +4151,14 @@
             <div class="form-group">
               <label>Default Routing Priority</label>
               <select id="preferredProviderSelect" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff;">
-                <option value="auto">Auto-Priority (GitHub Models ➔ Groq ➔ OpenRouter)</option>
+                <option value="auto">Auto-Priority (GitHub Models ➔ Groq)</option>
                 <option value="github">Force GitHub Models (Free Premium Models)</option>
                 <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
-                <option value="openrouter">Force OpenRouter (Requires OpenRouter Key)</option>
               </select>
               <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Prioritize which provider is queried first when multiple keys are configured.</span>
             </div>
           </div>
-          <div class="settings-section">
+          <div class="settings-section" style="display: none;">
             <div class="settings-section-title">OpenRouter API (Secondary / Fallback)</div>
             <div class="form-group">
               <button id="orLoginBtn" class="or-login-btn" onclick="startOpenRouterLogin()">
@@ -4552,20 +4551,14 @@
           if (pref === 'github') {
             const resp = await tryGithub();
             if (resp) return resp;
-            const resp2 = await tryGroq();
-            if (resp2) return resp2;
           } else if (pref === 'groq') {
             const resp = await tryGroq();
             if (resp) return resp;
-            const resp2 = await tryGithub();
-            if (resp2) return resp2;
-          } else if (pref === 'auto') {
+          } else { // 'auto'
             const resp = await tryGithub();
             if (resp) return resp;
             const resp2 = await tryGroq();
             if (resp2) return resp2;
-          } else if (pref === 'openrouter') {
-            // Force OpenRouter (do nothing, fallback executes below)
           }
         } catch (_) {}
       }

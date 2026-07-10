@@ -358,57 +358,58 @@ function APIKeyTab() {
           className="w-full px-4 py-3 bg-theme-dim border border-theme-primary rounded-lg
             focus:outline-none focus:glow-box"
         >
-          <option value="auto">Auto-Priority (GitHub Models ➔ Groq ➔ OpenRouter)</option>
+          <option value="auto">Auto-Priority (GitHub Models ➔ Groq)</option>
           <option value="github">Force GitHub Models (Free Premium Models)</option>
           <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
-          <option value="openrouter">Force OpenRouter (Requires OpenRouter Key)</option>
         </select>
       </div>
 
-      <hr className="border-theme-primary opacity-20" />
+      <div style={{ display: 'none' }}>
+        <hr className="border-theme-primary opacity-20" />
 
-      {/* OpenRouter API Key (Secondary/Fallback) */}
-      <div className="space-y-2">
-        <div>
-          <h3 className="text-lg font-semibold mb-2">OpenRouter API Key (Secondary/Fallback)</h3>
-          <p className="text-sm theme-secondary mb-4">
-            Used as a secondary option if the Groq query fails, or as the main option if no Groq key is set.
-            Get your key at{' '}
-            <a
-              href="https://openrouter.ai/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="theme-primary underline"
-            >
-              openrouter.ai
-            </a>
-          </p>
-        </div>
+        {/* OpenRouter API Key (Secondary/Fallback) */}
+        <div className="space-y-2">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">OpenRouter API Key (Secondary/Fallback)</h3>
+            <p className="text-sm theme-secondary mb-4">
+              Used as a secondary option if the Groq query fails, or as the main option if no Groq key is set.
+              Get your key at{' '}
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="theme-primary underline"
+              >
+                openrouter.ai
+              </a>
+            </p>
+          </div>
 
-        <div className="relative">
-          <input
-            type={showKey ? 'text' : 'password'}
-            value={localKey}
-            onChange={(e) => setLocalKey(e.target.value)}
-            onBlur={handleBlur}
-            placeholder="sk-or-v1-..."
-            className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
-              focus:outline-none focus:glow-box"
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-            {saved && (
-              <span className="flex items-center gap-1 text-xs text-green-500">
-                <Check className="w-3 h-3" />
-                Saved
-              </span>
-            )}
-            <button
-              onClick={() => setShowKey(!showKey)}
-              className="p-1 hover:theme-primary transition-colors"
-              aria-label={showKey ? 'Hide key' : 'Show key'}
-            >
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={localKey}
+              onChange={(e) => setLocalKey(e.target.value)}
+              onBlur={handleBlur}
+              placeholder="sk-or-v1-..."
+              className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
+                focus:outline-none focus:glow-box"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {saved && (
+                <span className="flex items-center gap-1 text-xs text-green-500">
+                  <Check className="w-3 h-3" />
+                  Saved
+                </span>
+              )}
+              <button
+                onClick={() => setShowKey(!showKey)}
+                className="p-1 hover:theme-primary transition-colors"
+                aria-label={showKey ? 'Hide key' : 'Show key'}
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>
