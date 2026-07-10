@@ -129,16 +129,16 @@ function mapToGithubModel(model: string): string {
   const m = model.toLowerCase();
   if (m.includes('gpt-4o-mini')) return 'gpt-4o-mini';
   if (m.includes('gpt-4o')) return 'gpt-4o';
-  if (m.includes('llama-3.1-405b')) return 'meta-llama-3.1-405b-instruct';
-  if (m.includes('llama-3.3-70b')) return 'meta-llama-3.3-70b-instruct';
-  if (m.includes('llama-3.1-8b')) return 'meta-llama-3.1-8b-instruct';
-  if (m.includes('command-r-plus')) return 'cohere-command-r-plus';
-  if (m.includes('mistral-large')) return 'mistral-large-2';
-  if (m.includes('phi-3-medium')) return 'phi-3-medium-128k-instruct';
+  if (m.includes('llama-3.1-405b')) return 'Meta-Llama-3.1-405B-Instruct';
+  if (m.includes('llama-3.3-70b')) return 'Meta-Llama-3.3-70B-Instruct';
+  if (m.includes('llama-3.1-8b')) return 'Meta-Llama-3.1-8B-Instruct';
+  if (m.includes('command-r-plus')) return 'Cohere-command-r-plus';
+  if (m.includes('mistral-large')) return 'Mistral-large-2';
+  if (m.includes('phi-3-medium')) return 'Phi-3-medium-128k-instruct';
   
   // Fallbacks for general models
   if (m.includes('claude')) return 'gpt-4o';
-  if (m.includes('grok')) return 'meta-llama-3.1-405b-instruct';
+  if (m.includes('grok')) return 'Meta-Llama-3.1-405B-Instruct';
   if (m.includes('gemini')) return 'gpt-4o-mini';
   
   return 'gpt-4o-mini';
@@ -182,7 +182,7 @@ export async function sendMessage({
       const cacheKey = `github:${githubModel}:${queryIdentifier}`;
 
       const fetchFn = async (): Promise<string> => {
-        const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+        let response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${githubApiKey}`,
@@ -191,6 +191,24 @@ export async function sendMessage({
           body: JSON.stringify(githubBody),
           signal
         })
+
+        // Auto-fallback for rate limit / daily quota issues on premium models on GitHub Models
+        if (!response.ok && (response.status === 429 || response.status === 403) && githubModel !== 'gpt-4o-mini') {
+          console.warn(`[GitHub Models] ${githubModel} limited (${response.status}). Falling back to gpt-4o-mini...`);
+          const fallbackBody = {
+            ...githubBody,
+            model: 'gpt-4o-mini'
+          };
+          response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${githubApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(fallbackBody),
+            signal
+          });
+        }
 
         if (response.ok) {
           const data = await response.json()
