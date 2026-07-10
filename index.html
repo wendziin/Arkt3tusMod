@@ -4610,11 +4610,33 @@
                 return response;
               };
 
-              const response = await fetchWithCache(cacheKey, fetchFn);
+              let response = await fetchWithCache(cacheKey, fetchFn);
               
+              // Auto-fallback for Groq rate limits (e.g. llama-3.1-8b-instant 429 fallback to llama-3.3-70b-versatile)
+              if (!response.ok && (response.status === 429 || response.status === 403) && groqModel === 'llama-3.1-8b-instant') {
+                if (typeof addThinkingLog === 'function') {
+                  addThinkingLog(`[Groq] llama-3.1-8b-instant limited (${response.status}). Falling back to llama-3.3-70b-versatile...`, 'info');
+                }
+                _log(`[Groq Interceptor] llama-3.1-8b-instant failed with status ${response.status}. Retrying on llama-3.3-70b-versatile.`);
+                
+                const fallbackBody = {
+                  ...groqBody,
+                  model: 'llama-3.3-70b-versatile'
+                };
+                const fallbackCacheKey = `groq:llama-3.3-70b-versatile:${queryIdentifier}`;
+                const fallbackFetchFn = async () => {
+                  return await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
+                    ...options,
+                    headers: groqHeaders,
+                    body: JSON.stringify(fallbackBody)
+                  });
+                };
+                response = await fetchWithCache(fallbackCacheKey, fallbackFetchFn);
+              }
+
               if (response.ok) {
                 if (typeof addThinkingLog === 'function') {
-                  addThinkingLog(`[Groq] SUCCESS: ${groqModel}`, 'success');
+                  addThinkingLog(`[Groq] SUCCESS: ${response.status === 200 && groqModel === 'llama-3.1-8b-instant' && response.clone().json().then(j => j.model).catch(() => '') === 'llama-3.3-70b-versatile' ? 'llama-3.3-70b-versatile' : groqModel}`, 'success');
                 }
                 if (typeof showProviderToast === 'function') {
                   showProviderToast('Groq Cloud');
