@@ -4755,29 +4755,8 @@
           if (isInsufficientCredits) {
             try {
               const getOpenRouterFreeEquivalent = (modelName) => {
-                const freeModels = [
-                  'google/gemini-2.5-flash',
-                  'google/gemini-2.5-pro',
-                  'meta-llama/llama-3.3-70b-instruct',
-                  'meta-llama/llama-3.1-8b-instruct',
-                  'qwen/qwen-2.5-72b-instruct',
-                  'deepseek/deepseek-chat',
-                  'mistralai/mistral-7b-instruct',
-                  'openchat/openchat-7b',
-                  'gryphe/mythomax-l2-13b',
-                  'undi-95/toppy-m-7b',
-                  'huggingfaceh4/zephyr-7b-beta'
-                ];
-                const matched = freeModels.find(m => modelName.startsWith(m));
-                if (matched && !modelName.endsWith(':free')) {
-                  return `${matched}:free`;
-                }
-                // Fallback for models without direct free version
-                if (!modelName.endsWith(':free')) {
-                  if (modelName.toLowerCase().includes('flash') || modelName.toLowerCase().includes('gemini')) {
-                    return 'google/gemini-2.5-flash:free';
-                  }
-                  return 'meta-llama/llama-3.3-70b-instruct:free';
+                if (modelName !== 'openrouter/free') {
+                  return 'openrouter/free';
                 }
                 return null;
               };
