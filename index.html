@@ -4392,6 +4392,27 @@
       promptsTried: 0               // Total prompts sent across all sessions
     };
 
+    // Deduplication cache for concurrent requests to avoid rate limits
+    const activeRequestsCache = new Map();
+    async function fetchWithCache(cacheKey, fetchFn) {
+      if (activeRequestsCache.has(cacheKey)) {
+        _log(`[Interceptor Cache] HIT: ${cacheKey}`);
+        const response = await activeRequestsCache.get(cacheKey);
+        return response.clone();
+      }
+      _log(`[Interceptor Cache] MISS: ${cacheKey}`);
+      const promise = fetchFn();
+      activeRequestsCache.set(cacheKey, promise);
+      try {
+        const response = await promise;
+        setTimeout(() => activeRequestsCache.delete(cacheKey), 1000);
+        return response.clone();
+      } catch (err) {
+        activeRequestsCache.delete(cacheKey);
+        throw err;
+      }
+    }
+
     // Global fetch interceptor for GitHub Models / Groq primary with OpenRouter fallback
     const nativeFetch = window.fetch;
     window.fetch = async function(url, options) {
@@ -4445,11 +4466,20 @@
 
               _log(`[GitHub Models Interceptor] Routing model ${body.model} -> ${githubModel} on GitHub Models`);
 
-              const response = await nativeFetch('https://models.inference.ai.azure.com/chat/completions', {
-                ...options,
-                headers: githubHeaders,
-                body: JSON.stringify(githubBody)
-              });
+              const lastMsg = body.messages && body.messages.length > 0 ? body.messages[body.messages.length - 1].content : '';
+              const queryIdentifier = typeof lastMsg === 'string' ? lastMsg.slice(0, 100) : JSON.stringify(lastMsg);
+              const cacheKey = `github:${githubModel}:${queryIdentifier}`;
+
+              const fetchFn = async () => {
+                const response = await nativeFetch('https://models.inference.ai.azure.com/chat/completions', {
+                  ...options,
+                  headers: githubHeaders,
+                  body: JSON.stringify(githubBody)
+                });
+                return response;
+              };
+
+              const response = await fetchWithCache(cacheKey, fetchFn);
 
               if (response.ok) {
                 if (typeof addThinkingLog === 'function') {
@@ -4517,11 +4547,20 @@
 
               _log(`[Groq Interceptor] Routing model ${body.model} -> ${groqModel} on Groq Cloud`);
               
-              const response = await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
-                ...options,
-                headers: groqHeaders,
-                body: JSON.stringify(groqBody)
-              });
+              const lastMsg = body.messages && body.messages.length > 0 ? body.messages[body.messages.length - 1].content : '';
+              const queryIdentifier = typeof lastMsg === 'string' ? lastMsg.slice(0, 100) : JSON.stringify(lastMsg);
+              const cacheKey = `groq:${groqModel}:${queryIdentifier}`;
+
+              const fetchFn = async () => {
+                const response = await nativeFetch('https://api.groq.com/openai/v1/chat/completions', {
+                  ...options,
+                  headers: groqHeaders,
+                  body: JSON.stringify(groqBody)
+                });
+                return response;
+              };
+
+              const response = await fetchWithCache(cacheKey, fetchFn);
               
               if (response.ok) {
                 if (typeof addThinkingLog === 'function') {

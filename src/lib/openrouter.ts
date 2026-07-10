@@ -5,6 +5,26 @@
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
+// Deduplication cache for concurrent requests to avoid rate limits
+const activeRequestsCache = new Map<string, Promise<string>>();
+async function fetchWithCache(cacheKey: string, fetchFn: () => Promise<string>): Promise<string> {
+  if (activeRequestsCache.has(cacheKey)) {
+    console.log(`[Next.js Request Cache] HIT: ${cacheKey}`);
+    return activeRequestsCache.get(cacheKey)!;
+  }
+  console.log(`[Next.js Request Cache] MISS: ${cacheKey}`);
+  const promise = fetchFn();
+  activeRequestsCache.set(cacheKey, promise);
+  try {
+    const result = await promise;
+    setTimeout(() => activeRequestsCache.delete(cacheKey), 1000);
+    return result;
+  } catch (err) {
+    activeRequestsCache.delete(cacheKey);
+    throw err;
+  }
+}
+
 /**
  * Maps API error responses to specific, actionable user-facing messages.
  */
@@ -157,25 +177,33 @@ export async function sendMessage({
       }
       if (top_p !== undefined) githubBody.top_p = top_p
 
-      const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${githubApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(githubBody),
-        signal
-      })
+      const lastMsg = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
+      const queryIdentifier = typeof lastMsg === 'string' ? lastMsg.slice(0, 100) : JSON.stringify(lastMsg);
+      const cacheKey = `github:${githubModel}:${queryIdentifier}`;
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.choices && data.choices.length > 0) {
-          return data.choices[0].message.content
+      const fetchFn = async (): Promise<string> => {
+        const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${githubApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(githubBody),
+          signal
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.choices && data.choices.length > 0) {
+            return data.choices[0].message.content
+          }
         }
-      } else {
         const err = await response.json().catch(() => ({}))
-        console.warn('GitHub Models query failed:', err.error?.message || response.statusText)
-      }
+        throw new Error(err.error?.message || response.statusText)
+      };
+
+      const result = await fetchWithCache(cacheKey, fetchFn);
+      return result;
     } catch (e: any) {
       console.warn('Error during GitHub Models query:', e.message)
     }
@@ -198,25 +226,33 @@ export async function sendMessage({
       if (presence_penalty !== undefined) groqBody.presence_penalty = presence_penalty
       if (repetition_penalty !== undefined) groqBody.repetition_penalty = repetition_penalty
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(groqBody),
-        signal
-      })
+      const lastMsg = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
+      const queryIdentifier = typeof lastMsg === 'string' ? lastMsg.slice(0, 100) : JSON.stringify(lastMsg);
+      const cacheKey = `groq:${groqModel}:${queryIdentifier}`;
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.choices && data.choices.length > 0) {
-          return data.choices[0].message.content
+      const fetchFn = async (): Promise<string> => {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(groqBody),
+          signal
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.choices && data.choices.length > 0) {
+            return data.choices[0].message.content
+          }
         }
-      } else {
         const err = await response.json().catch(() => ({}))
-        console.warn('Groq query failed:', err.error?.message || response.statusText)
-      }
+        throw new Error(err.error?.message || response.statusText)
+      };
+
+      const result = await fetchWithCache(cacheKey, fetchFn);
+      return result;
     } catch (e: any) {
       console.warn('Error during Groq query:', e.message)
     }
