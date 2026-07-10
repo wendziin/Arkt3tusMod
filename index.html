@@ -4739,7 +4739,67 @@
         if (typeof showProviderToast === 'function') {
           showProviderToast('OpenRouter');
         }
-        return nativeFetch(url, options);
+        
+        let response = await nativeFetch(url, options);
+        
+        // Auto-fallback to :free equivalent if account has insufficient credits (402/400 containing credit/payment info)
+        if (!response.ok) {
+          const errClone = response.clone();
+          const errText = await errClone.text().catch(() => '');
+          const isInsufficientCredits = response.status === 402 || 
+                                        errText.includes('Insufficient credits') || 
+                                        errText.includes('credit') || 
+                                        errText.includes('payment') || 
+                                        errText.includes('balance');
+          
+          if (isInsufficientCredits) {
+            try {
+              const getOpenRouterFreeEquivalent = (modelName) => {
+                const freeModels = [
+                  'google/gemini-2.5-flash',
+                  'google/gemini-2.5-pro',
+                  'meta-llama/llama-3.3-70b-instruct',
+                  'meta-llama/llama-3.1-8b-instruct',
+                  'qwen/qwen-2.5-72b-instruct',
+                  'deepseek/deepseek-chat',
+                  'mistralai/mistral-7b-instruct',
+                  'openchat/openchat-7b',
+                  'gryphe/mythomax-l2-13b',
+                  'undi-95/toppy-m-7b',
+                  'huggingfaceh4/zephyr-7b-beta'
+                ];
+                const matched = freeModels.find(m => modelName.startsWith(m));
+                if (matched && !modelName.endsWith(':free')) {
+                  return `${matched}:free`;
+                }
+                return null;
+              };
+
+              const body = JSON.parse(options.body);
+              const freeModel = getOpenRouterFreeEquivalent(body.model);
+              if (freeModel) {
+                if (typeof addThinkingLog === 'function') {
+                  addThinkingLog(`[OpenRouter] Insufficient credits for ${body.model}. Retrying with free version ${freeModel}...`, 'info');
+                }
+                _log(`[OpenRouter Interceptor] Insufficient credits for ${body.model}. Retrying with free version ${freeModel}.`);
+                
+                const fallbackBody = {
+                  ...body,
+                  model: freeModel
+                };
+                const fallbackOptions = {
+                  ...options,
+                  body: JSON.stringify(fallbackBody)
+                };
+                response = await nativeFetch(url, fallbackOptions);
+              }
+            } catch (e) {
+              _warn(`[OpenRouter Interceptor] Failed to retry with free model:`, e.message);
+            }
+          }
+        }
+        
+        return response;
       }
 
       if (typeof addThinkingLog === 'function') {

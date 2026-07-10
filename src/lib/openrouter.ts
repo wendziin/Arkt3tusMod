@@ -319,10 +319,9 @@ export async function sendMessage({
     if (res2 !== null) return res2;
   }
 
-  // --- SECONDARY OPTION: OPENROUTER (DISABLED) ---
-  /*
+  // --- SECONDARY OPTION: OPENROUTER ---
   if (!apiKey) {
-    throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
+    throw new Error('OpenRouter API key is not configured. Please go to Settings → API Key and enter a valid key.')
   }
 
   // Prepare request body
@@ -353,7 +352,7 @@ export async function sendMessage({
     body.provider = providerOptions
   }
 
-  const response = await fetch(OPENROUTER_API_URL, {
+  let response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -364,6 +363,60 @@ export async function sendMessage({
     body: JSON.stringify(body),
     signal
   })
+
+  // Auto-fallback to :free equivalent on OpenRouter if credit error
+  if (!response.ok) {
+    const errClone = response.clone();
+    const errText = await errClone.text().catch(() => '');
+    const isInsufficientCredits = response.status === 402 || 
+                                  errText.includes('Insufficient credits') || 
+                                  errText.includes('credit') || 
+                                  errText.includes('payment') || 
+                                  errText.includes('balance');
+    
+    if (isInsufficientCredits) {
+      const getOpenRouterFreeEquivalent = (modelName: string): string | null => {
+        const freeModels = [
+          'google/gemini-2.5-flash',
+          'google/gemini-2.5-pro',
+          'meta-llama/llama-3.3-70b-instruct',
+          'meta-llama/llama-3.1-8b-instruct',
+          'qwen/qwen-2.5-72b-instruct',
+          'deepseek/deepseek-chat',
+          'mistralai/mistral-7b-instruct',
+          'openchat/openchat-7b',
+          'gryphe/mythomax-l2-13b',
+          'undi-95/toppy-m-7b',
+          'huggingfaceh4/zephyr-7b-beta'
+        ];
+        const matched = freeModels.find(m => modelName.startsWith(m));
+        if (matched && !modelName.endsWith(':free')) {
+          return `${matched}:free`;
+        }
+        return null;
+      };
+
+      const freeModel = getOpenRouterFreeEquivalent(model);
+      if (freeModel) {
+        console.warn(`[OpenRouter] Insufficient credits for ${model}. Retrying with free version ${freeModel}...`);
+        const fallbackBody = {
+          ...body,
+          model: freeModel
+        };
+        response = await fetch(OPENROUTER_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://godmod3.ai',
+            'X-Title': 'GODMOD3.AI'
+          },
+          body: JSON.stringify(fallbackBody),
+          signal
+        });
+      }
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
@@ -377,8 +430,6 @@ export async function sendMessage({
   }
 
   return data.choices[0].message.content
-  */
-  throw new Error('OpenRouter is disabled. Please configure GitHub Models or Groq Cloud in Settings.');
 }
 
 /**
