@@ -181,6 +181,20 @@ export async function sendMessage({
       const queryIdentifier = typeof lastMsg === 'string' ? lastMsg.slice(0, 100) : JSON.stringify(lastMsg);
       const cacheKey = `github:${githubModel}:${queryIdentifier}`;
 
+      const getFallbackSequence = (modelName: string): string[] => {
+        const m = modelName.toLowerCase();
+        if (m.includes('llama-3.1-405b')) {
+          return ['Meta-Llama-3.3-70B-Instruct', 'gpt-4o-mini'];
+        }
+        if (m.includes('gpt-4o') && !m.includes('mini')) {
+          return ['gpt-4o-mini'];
+        }
+        if (modelName !== 'gpt-4o-mini') {
+          return ['gpt-4o-mini'];
+        }
+        return [];
+      };
+
       const fetchFn = async (): Promise<string> => {
         let response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
           method: 'POST',
@@ -192,22 +206,36 @@ export async function sendMessage({
           signal
         })
 
-        // Auto-fallback for rate limit / daily quota issues on premium models on GitHub Models
-        if (!response.ok && (response.status === 429 || response.status === 403) && githubModel !== 'gpt-4o-mini') {
-          console.warn(`[GitHub Models] ${githubModel} limited (${response.status}). Falling back to gpt-4o-mini...`);
-          const fallbackBody = {
-            ...githubBody,
-            model: 'gpt-4o-mini'
-          };
-          response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${githubApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(fallbackBody),
-            signal
-          });
+        let currentModelName = githubModel;
+        if (!response.ok) {
+          const fallbacks = getFallbackSequence(githubModel);
+          for (const fallbackModel of fallbacks) {
+            const errText = await response.clone().text().catch(() => '');
+            const isRateLimit = response.status === 429 || response.status === 403;
+            const isUnknown = response.status === 400 && errText.includes('unknown_model');
+            
+            if (isRateLimit || isUnknown) {
+              console.warn(`[GitHub Models] ${currentModelName} failed (${response.status}). Retrying with ${fallbackModel}...`);
+              const fallbackBody = {
+                ...githubBody,
+                model: fallbackModel
+              };
+              response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${githubApiKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(fallbackBody),
+                signal
+              });
+              currentModelName = fallbackModel;
+              
+              if (response.ok) {
+                break;
+              }
+            }
+          }
         }
 
         if (response.ok) {

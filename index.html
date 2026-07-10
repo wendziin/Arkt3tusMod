@@ -4479,33 +4479,61 @@
                 return response;
               };
 
+              const getFallbackSequence = (modelName) => {
+                const m = modelName.toLowerCase();
+                if (m.includes('llama-3.1-405b')) {
+                  return ['Meta-Llama-3.3-70B-Instruct', 'gpt-4o-mini'];
+                }
+                if (m.includes('gpt-4o') && !m.includes('mini')) {
+                  return ['gpt-4o-mini'];
+                }
+                if (modelName !== 'gpt-4o-mini') {
+                  return ['gpt-4o-mini'];
+                }
+                return [];
+              };
+
+              let finalModel = githubModel;
               let response = await fetchWithCache(cacheKey, fetchFn);
 
-              // Auto-fallback for rate limit / daily quota issues on premium models on GitHub Models
-              if (!response.ok && (response.status === 429 || response.status === 403) && githubModel !== 'gpt-4o-mini') {
-                if (typeof addThinkingLog === 'function') {
-                  addThinkingLog(`[GitHub Models] ${githubModel} limited (${response.status}). Falling back to gpt-4o-mini...`, 'info');
+              if (!response.ok) {
+                const fallbacks = getFallbackSequence(githubModel);
+                for (const fallbackModel of fallbacks) {
+                  const errText = await response.clone().text().catch(() => '');
+                  const isRateLimit = response.status === 429 || response.status === 403;
+                  const isUnknown = response.status === 400 && errText.includes('unknown_model');
+                  
+                  if (isRateLimit || isUnknown) {
+                    if (typeof addThinkingLog === 'function') {
+                      addThinkingLog(`[GitHub Models] ${finalModel} failed (${response.status}). Retrying with ${fallbackModel}...`, 'info');
+                    }
+                    _log(`[GitHub Models Interceptor] ${finalModel} failed (${response.status}). Retrying with ${fallbackModel}.`);
+                    
+                    const fallbackBody = {
+                      ...githubBody,
+                      model: fallbackModel
+                    };
+                    const fallbackCacheKey = `github:${fallbackModel}:${queryIdentifier}`;
+                    const fallbackFetchFn = async () => {
+                      return await nativeFetch('https://models.inference.ai.azure.com/chat/completions', {
+                        ...options,
+                        headers: githubHeaders,
+                        body: JSON.stringify(fallbackBody)
+                      });
+                    };
+                    response = await fetchWithCache(fallbackCacheKey, fallbackFetchFn);
+                    finalModel = fallbackModel;
+                    
+                    if (response.ok) {
+                      break;
+                    }
+                  }
                 }
-                _log(`[GitHub Models Interceptor] ${githubModel} failed with status ${response.status}. Retrying on gpt-4o-mini.`);
-                
-                const fallbackBody = {
-                  ...githubBody,
-                  model: 'gpt-4o-mini'
-                };
-                const fallbackCacheKey = `github:gpt-4o-mini:${queryIdentifier}`;
-                const fallbackFetchFn = async () => {
-                  return await nativeFetch('https://models.inference.ai.azure.com/chat/completions', {
-                    ...options,
-                    headers: githubHeaders,
-                    body: JSON.stringify(fallbackBody)
-                  });
-                };
-                response = await fetchWithCache(fallbackCacheKey, fallbackFetchFn);
               }
 
               if (response.ok) {
                 if (typeof addThinkingLog === 'function') {
-                  addThinkingLog(`[GitHub Models] SUCCESS: ${response.status === 200 && githubModel !== 'gpt-4o-mini' && response.clone().json().then(j => j.model).catch(() => '') === 'gpt-4o-mini' ? 'gpt-4o-mini' : githubModel}`, 'success');
+                  addThinkingLog(`[GitHub Models] SUCCESS: ${finalModel}`, 'success');
                 }
                 if (typeof showProviderToast === 'function') {
                   showProviderToast('GitHub Models');
