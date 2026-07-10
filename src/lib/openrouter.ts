@@ -393,6 +393,13 @@ export async function sendMessage({
         if (matched && !modelName.endsWith(':free')) {
           return `${matched}:free`;
         }
+        // Fallback for models without direct free version
+        if (!modelName.endsWith(':free')) {
+          if (modelName.toLowerCase().includes('flash') || modelName.toLowerCase().includes('gemini')) {
+            return 'google/gemini-2.5-flash:free';
+          }
+          return 'meta-llama/llama-3.3-70b-instruct:free';
+        }
         return null;
       };
 
