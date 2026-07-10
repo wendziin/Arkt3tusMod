@@ -3380,10 +3380,11 @@
         <div class="empty-state">No conversations yet</div>
       </div>
 
-      <div class="sidebar-footer">
+      <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 6px; align-items: stretch;">
         <button class="settings-btn" onclick="openSettings()">
           <span>⚙</span> Settings
         </button>
+        <div id="appVersionIndicator" style="font-size: 10px; color: #555; font-family: monospace; text-align: center; margin-top: 2px;"></div>
       </div>
     </aside>
 
@@ -4295,6 +4296,63 @@
   </div>
 
   <script>
+    // Version control via URL (e.g. ?v=1.2.3)
+    // If the version query parameter is present and differs from the saved version,
+    // we clear caches, unregister service workers, and force reload to ensure the new version is loaded.
+    (async function checkVersionControl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlVersion = urlParams.get('v') || urlParams.get('version') || urlParams.get('build') || urlParams.get('t');
+      
+      if (urlVersion) {
+        const storedVersion = localStorage.getItem('g0dm0d3_build_version');
+        if (storedVersion !== urlVersion) {
+          console.log(`[Version Control] Version changed from ${storedVersion} to ${urlVersion}. Clearing cache...`);
+          
+          // 1. Unregister all service workers
+          if ('serviceWorker' in navigator) {
+            try {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              for (const registration of registrations) {
+                await registration.unregister();
+                console.log('[Version Control] Unregistered service worker');
+              }
+            } catch (e) {
+              console.warn('[Version Control] Failed to unregister service workers:', e);
+            }
+          }
+          
+          // 2. Clear all cache storages
+          if ('caches' in window) {
+            try {
+              const cacheNames = await caches.keys();
+              for (const cacheName of cacheNames) {
+                await caches.delete(cacheName);
+                console.log(`[Version Control] Deleted cache: ${cacheName}`);
+              }
+            } catch (e) {
+              console.warn('[Version Control] Failed to clear caches:', e);
+            }
+          }
+          
+          // 3. Save new version to localStorage
+          localStorage.setItem('g0dm0d3_build_version', urlVersion);
+          
+          // 4. Force reload bypassing cache
+          console.log('[Version Control] Reloading page to apply updates...');
+          window.location.reload();
+          return;
+        }
+      }
+    })();
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const versionIndicator = document.getElementById('appVersionIndicator');
+      if (versionIndicator) {
+        const storedVer = localStorage.getItem('g0dm0d3_build_version') || '1.0.0';
+        versionIndicator.textContent = `Build: v${storedVer}`;
+      }
+    });
+
     // Fade out and remove PWA Splash Screen
     window.addEventListener('load', () => {
       const splash = document.getElementById('pwa-splash');
