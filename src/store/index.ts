@@ -101,7 +101,9 @@ export interface AppState {
   apiKey: string
   groqApiKey: string
   githubApiKey: string
-  preferredProvider: 'auto' | 'github' | 'groq' | 'openrouter'
+  omnirouteUrl: string
+  omnirouteApiKey: string
+  preferredProvider: 'auto' | 'github' | 'groq' | 'openrouter' | 'omniroute'
   defaultModel: string
   conversations: Conversation[]
   currentConversationId: string | null
@@ -186,7 +188,9 @@ export interface AppState {
   setApiKey: (key: string) => void
   setGroqApiKey: (groqApiKey: string) => void
   setGithubApiKey: (githubApiKey: string) => void
-  setPreferredProvider: (provider: 'auto' | 'github' | 'groq' | 'openrouter') => void
+  setOmnirouteUrl: (omnirouteUrl: string) => void
+  setOmnirouteApiKey: (omnirouteApiKey: string) => void
+  setPreferredProvider: (provider: 'auto' | 'github' | 'groq' | 'openrouter' | 'omniroute') => void
   setDefaultModel: (model: string) => void
   setShowSettings: (show: boolean) => void
   setShowMagic: (show: boolean) => void
@@ -359,6 +363,8 @@ export const useStore = create<AppState>()(
       apiKey: '',
       groqApiKey: '',
       githubApiKey: '',
+      omnirouteUrl: 'http://localhost:20128/v1',
+      omnirouteApiKey: '',
       preferredProvider: 'auto',
       defaultModel: 'anthropic/claude-3.5-sonnet',
       conversations: [],
@@ -437,6 +443,8 @@ export const useStore = create<AppState>()(
       setApiKey: (apiKey) => set({ apiKey }),
       setGroqApiKey: (groqApiKey) => set({ groqApiKey }),
       setGithubApiKey: (githubApiKey) => set({ githubApiKey }),
+      setOmnirouteUrl: (omnirouteUrl) => set({ omnirouteUrl }),
+      setOmnirouteApiKey: (omnirouteApiKey) => set({ omnirouteApiKey }),
       setPreferredProvider: (preferredProvider) => set({ preferredProvider }),
       setDefaultModel: (defaultModel) => set({ defaultModel }),
       setShowSettings: (showSettings) => set({ showSettings }),
@@ -729,7 +737,7 @@ export const useStore = create<AppState>()(
         // stmModules excluded: transformer functions can't be serialized/deserialized
         const allowed = [
           'conversations', 'currentConversationId', 'theme', 'defaultModel',
-          'currentPersona', 'apiKey', 'groqApiKey', 'githubApiKey', 'preferredProvider', 'autoTuneEnabled', 'autoTuneStrategy',
+          'currentPersona', 'apiKey', 'groqApiKey', 'githubApiKey', 'omnirouteUrl', 'omnirouteApiKey', 'preferredProvider', 'autoTuneEnabled', 'autoTuneStrategy',
           'autoTuneOverrides', 'feedbackState', 'parseltongueConfig',
           'memories', 'memoriesEnabled', 'customSystemPrompt', 'useCustomSystemPrompt',
           'consortiumEnabled', 'consortiumTier', 'liquidResponseEnabled', 'liquidMinDelta',
@@ -753,6 +761,8 @@ export const useStore = create<AppState>()(
         apiKey: state.apiKey,
         groqApiKey: state.groqApiKey,
         githubApiKey: state.githubApiKey,
+        omnirouteUrl: state.omnirouteUrl,
+        omnirouteApiKey: state.omnirouteApiKey,
         preferredProvider: state.preferredProvider,
         defaultModel: state.defaultModel,
         conversations: state.conversations,

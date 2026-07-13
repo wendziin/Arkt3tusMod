@@ -4156,6 +4156,7 @@
                 <option value="github">Force GitHub Models (Free Premium Models)</option>
                 <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
                 <option value="openrouter">Force OpenRouter (All AI Models / Paid)</option>
+                <option value="omniroute">Force OmniRoute Gateway (Local Proxy)</option>
               </select>
               <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Prioritize which provider is queried first when multiple keys are configured.</span>
             </div>
@@ -4177,6 +4178,18 @@
               <input type="password" id="apiKeyInput" placeholder="sk-or-...">
               <span id="apiKeyHint" style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Stored in your browser's localStorage only. Never sent to G0DM0D3 servers.</span>
               <a href="https://openrouter.ai/keys" target="_blank" class="api-key-link">Get your API key at OpenRouter →</a>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-title">OmniRoute Gateway (Local AI Router)</div>
+            <div class="form-group">
+              <label>OmniRoute Local Endpoint</label>
+              <input type="text" id="omnirouteUrlInput" placeholder="http://localhost:20128/v1">
+              <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:4px;">Local proxy endpoint. Defaults to http://localhost:20128/v1</span>
+            </div>
+            <div class="form-group">
+              <label>API Key (Optional)</label>
+              <input type="password" id="omnirouteApiKeyInput" placeholder="Enter key if required...">
             </div>
           </div>
           <div class="settings-section">
@@ -4406,6 +4419,8 @@
       apiKey: '',
       groqApiKey: '',
       githubApiKey: '',
+      omnirouteUrl: 'http://localhost:20128/v1',
+      omnirouteApiKey: '',
       preferredProvider: 'auto',
       orOAuthConnected: false,
       model: 'anthropic/claude-opus-4.6',
@@ -4482,6 +4497,62 @@
           const hasGithub = state.githubApiKey && state.githubApiKey !== 'undefined' && state.githubApiKey !== 'null' && state.githubApiKey.trim() !== '' && !state.githubApiKey.startsWith('enc:');
           const hasGroq = state.groqApiKey && state.groqApiKey !== 'undefined' && state.groqApiKey !== 'null' && state.groqApiKey.trim() !== '' && !state.groqApiKey.startsWith('enc:');
           const pref = state.preferredProvider || 'auto';
+
+          // Helper: Try OmniRoute
+          const tryOmniroute = async () => {
+            const hasOmniroute = state.omnirouteUrl && state.omnirouteUrl.trim() !== '';
+            if (!hasOmniroute) return null;
+            
+            if (typeof addThinkingLog === 'function') {
+              addThinkingLog(`[OmniRoute] Intercepting: ${body.model}...`, 'info');
+            }
+            
+            try {
+              const omniUrl = state.omnirouteUrl.endsWith('/chat/completions') 
+                ? state.omnirouteUrl 
+                : `${state.omnirouteUrl.replace(/\/$/, '')}/chat/completions`;
+              
+              const omniHeaders = {
+                ...options.headers,
+                'Content-Type': 'application/json'
+              };
+              if (state.omnirouteApiKey) {
+                omniHeaders['Authorization'] = `Bearer ${state.omnirouteApiKey}`;
+              } else {
+                delete omniHeaders['Authorization'];
+              }
+
+              _log(`[OmniRoute Interceptor] Routing model ${body.model} on local proxy`);
+              
+              const response = await nativeFetch(omniUrl, {
+                ...options,
+                headers: omniHeaders,
+                body: options.body
+              });
+
+              if (response.ok) {
+                if (typeof addThinkingLog === 'function') {
+                  addThinkingLog(`[OmniRoute] SUCCESS: ${body.model}`, 'success');
+                }
+                if (typeof showProviderToast === 'function') {
+                  showProviderToast('OmniRoute');
+                }
+                return response;
+              }
+              
+              const errText = await response.clone().text().catch(() => '');
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[OmniRoute] Status ${response.status} failed: ${errText.slice(0, 100)}`, 'fail');
+              }
+              _warn(`[OmniRoute Interceptor] Returned error, trying OpenRouter fallback:`, errText);
+            } catch (e) {
+              if (typeof addThinkingLog === 'function') {
+                addThinkingLog(`[OmniRoute] Error: ${e.message}`, 'fail');
+              }
+              _warn(`[OmniRoute Interceptor] Failed to route to OmniRoute:`, e.message);
+            }
+            return null;
+          };
 
           // Helper: Try GitHub Models
           const tryGithub = async () => {
@@ -4718,12 +4789,17 @@
           };
 
           // Execute routing priority
-          if (pref === 'github') {
+          if (pref === 'omniroute') {
+            const resp = await tryOmniroute();
+            if (resp) return resp;
+          } else if (pref === 'github') {
             const resp = await tryGithub();
             if (resp) return resp;
           } else if (pref === 'groq') {
             const resp = await tryGroq();
             if (resp) return resp;
+          } else if (pref === 'openrouter') {
+            // Straight to OpenRouter fallback
           } else { // 'auto'
             const resp = await tryGithub();
             if (resp) return resp;
@@ -12582,7 +12658,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
     // Whitelist of allowed state keys — prevents injected localStorage
     // keys from polluting application state
     const STATE_KEYS = new Set([
-      'apiKey', 'groqApiKey', 'githubApiKey', 'preferredProvider', 'orOAuthConnected', 'model', 'persona',
+      'apiKey', 'groqApiKey', 'githubApiKey', 'omnirouteUrl', 'omnirouteApiKey', 'preferredProvider', 'orOAuthConnected', 'model', 'persona',
       'customSystemPrompt', 'customSystemPromptEnabled',
       'conversations', 'currentId', 'noLogMode', 'sidebarOpen',
       'autoRetry', 'parseltongue', 'parseltongueTier', 'maxRetries',
@@ -12666,6 +12742,26 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       } else if (state.githubApiKey) {
         encryptApiKey(state.githubApiKey).then(enc => {
           localStorage.setItem('g0dm0d3-githubapikey', enc);
+        });
+      }
+
+      // Decrypt OmniRoute API key asynchronously (with sync fallback)
+      const encOmnirouteKey = localStorage.getItem('g0dm0d3-omnirouteapikey');
+      if (encOmnirouteKey) {
+        if (!encOmnirouteKey.startsWith('enc:')) {
+          state.omnirouteApiKey = encOmnirouteKey;
+          const omnirouteInput = document.getElementById('omnirouteApiKeyInput');
+          if (omnirouteInput) omnirouteInput.value = encOmnirouteKey;
+        } else {
+          decryptApiKey(encOmnirouteKey).then(plain => {
+            state.omnirouteApiKey = plain;
+            const omnirouteInput = document.getElementById('omnirouteApiKeyInput');
+            if (omnirouteInput) omnirouteInput.value = plain;
+          });
+        }
+      } else if (state.omnirouteApiKey) {
+        encryptApiKey(state.omnirouteApiKey).then(enc => {
+          localStorage.setItem('g0dm0d3-omnirouteapikey', enc);
         });
       }
       _log('[DEBUG] loadState: final state.ultraplinian =', state.ultraplinian);
@@ -12911,7 +13007,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       _saveStatePending = false;
       enforceDataCaps(); // Cap unbounded arrays before serialization
       // Strip API keys from the main blob — they are stored encrypted separately
-      const { apiKey, groqApiKey, githubApiKey, ...stateWithoutKey } = state;
+      const { apiKey, groqApiKey, githubApiKey, omnirouteApiKey, ...stateWithoutKey } = state;
       const payload = JSON.stringify(stateWithoutKey);
 
       // Persist encrypted keys separately (async, best-effort)
@@ -12935,6 +13031,13 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         });
       } else {
         try { localStorage.removeItem('g0dm0d3-githubapikey'); } catch (_) {}
+      }
+      if (omnirouteApiKey) {
+        encryptApiKey(omnirouteApiKey).then(enc => {
+          try { localStorage.setItem('g0dm0d3-omnirouteapikey', enc); } catch (_) {}
+        });
+      } else {
+        try { localStorage.removeItem('g0dm0d3-omnirouteapikey'); } catch (_) {}
       }
 
       try {
@@ -16612,6 +16715,8 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       document.getElementById('apiKeyInput').value = state.apiKey;
       document.getElementById('groqApiKeyInput').value = state.groqApiKey || '';
       document.getElementById('githubApiKeyInput').value = state.githubApiKey || '';
+      document.getElementById('omnirouteUrlInput').value = state.omnirouteUrl || 'http://localhost:20128/v1';
+      document.getElementById('omnirouteApiKeyInput').value = state.omnirouteApiKey || '';
       document.getElementById('preferredProviderSelect').value = state.preferredProvider || 'auto';
       updateOAuthUI();
       document.getElementById('defaultModelInput').value = state.model;
@@ -16772,6 +16877,8 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
       state.apiKey = newKey;
       state.groqApiKey = document.getElementById('groqApiKeyInput').value.trim();
       state.githubApiKey = document.getElementById('githubApiKeyInput').value.trim();
+      state.omnirouteUrl = document.getElementById('omnirouteUrlInput').value.trim() || 'http://localhost:20128/v1';
+      state.omnirouteApiKey = document.getElementById('omnirouteApiKeyInput').value.trim();
       state.preferredProvider = document.getElementById('preferredProviderSelect').value;
       state.model = document.getElementById('defaultModelInput').value;
       state.persona = document.getElementById('personaSelect').value;

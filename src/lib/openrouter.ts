@@ -85,7 +85,9 @@ interface SendMessageOptions {
   apiKey: string
   groqApiKey?: string
   githubApiKey?: string
-  preferredProvider?: 'auto' | 'github' | 'groq' | 'openrouter'
+  omnirouteUrl?: string
+  omnirouteApiKey?: string
+  preferredProvider?: 'auto' | 'github' | 'groq' | 'openrouter' | 'omniroute'
   noLog?: boolean
   signal?: AbortSignal
   temperature?: number
@@ -153,6 +155,9 @@ export async function sendMessage({
   apiKey,
   groqApiKey,
   githubApiKey,
+  omnirouteUrl,
+  omnirouteApiKey,
+  preferredProvider,
   noLog = false,
   signal,
   temperature = 0.7,
@@ -164,6 +169,54 @@ export async function sendMessage({
   repetition_penalty
 }: SendMessageOptions): Promise<string> {
   const pref = preferredProvider || 'auto';
+
+  const tryOmniroute = async (): Promise<string | null> => {
+    if (!omnirouteUrl) return null;
+    try {
+      const omniUrl = omnirouteUrl.endsWith('/chat/completions') 
+        ? omnirouteUrl 
+        : `${omnirouteUrl.replace(/\/$/, '')}/chat/completions`;
+
+      const omniBody: Record<string, unknown> = {
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens
+      }
+      if (top_p !== undefined) omniBody.top_p = top_p
+      if (top_k !== undefined) omniBody.top_k = top_k
+      if (frequency_penalty !== undefined) omniBody.frequency_penalty = frequency_penalty
+      if (presence_penalty !== undefined) omniBody.presence_penalty = presence_penalty
+      if (repetition_penalty !== undefined) omniBody.repetition_penalty = repetition_penalty
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (omnirouteApiKey) {
+        headers['Authorization'] = `Bearer ${omnirouteApiKey}`;
+      }
+
+      console.log(`[OmniRoute] Routing model ${model} to local proxy: ${omniUrl}`);
+      const response = await fetch(omniUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(omniBody),
+        signal
+      });
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.choices && data.choices.length > 0) {
+          return data.choices[0].message.content
+        }
+      }
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error?.message || response.statusText)
+    } catch (e: any) {
+      console.warn('Error during OmniRoute query:', e.message)
+    }
+    return null;
+  }
 
   const tryGithub = async (): Promise<string | null> => {
     if (!githubApiKey) return null;
@@ -306,12 +359,17 @@ export async function sendMessage({
   }
 
   // Execute routing priority
-  if (pref === 'github') {
+  if (pref === 'omniroute') {
+    const res = await tryOmniroute();
+    if (res !== null) return res;
+  } else if (pref === 'github') {
     const res = await tryGithub();
     if (res !== null) return res;
   } else if (pref === 'groq') {
     const res = await tryGroq();
     if (res !== null) return res;
+  } else if (pref === 'openrouter') {
+    // Straight to OpenRouter fallback
   } else { // 'auto'
     const res = await tryGithub();
     if (res !== null) return res;

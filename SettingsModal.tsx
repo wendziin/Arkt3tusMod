@@ -212,7 +212,14 @@ function TabButton({
 }
 
 function APIKeyTab() {
-  const { apiKey, setApiKey, groqApiKey, setGroqApiKey, githubApiKey, setGithubApiKey, preferredProvider, setPreferredProvider } = useStore()
+  const { 
+    apiKey, setApiKey, 
+    groqApiKey, setGroqApiKey, 
+    githubApiKey, setGithubApiKey, 
+    omnirouteUrl, setOmnirouteUrl,
+    omnirouteApiKey, setOmnirouteApiKey,
+    preferredProvider, setPreferredProvider 
+  } = useStore()
   const [showKey, setShowKey] = useState(false)
   const [localKey, setLocalKey] = useState(apiKey)
   const [saved, setSaved] = useState(false)
@@ -224,6 +231,11 @@ function APIKeyTab() {
   const [showGithubKey, setShowGithubKey] = useState(false)
   const [localGithubKey, setLocalGithubKey] = useState(githubApiKey)
   const [githubSaved, setGithubSaved] = useState(false)
+
+  const [localOmnirouteUrl, setLocalOmnirouteUrl] = useState(omnirouteUrl)
+  const [localOmnirouteApiKey, setLocalOmnirouteApiKey] = useState(omnirouteApiKey)
+  const [omnirouteSaved, setOmnirouteSaved] = useState(false)
+  const [showOmnirouteKey, setShowOmnirouteKey] = useState(false)
 
   const handleBlur = () => {
     if (localKey !== apiKey) {
@@ -246,6 +258,22 @@ function APIKeyTab() {
       setGithubApiKey(localGithubKey)
       setGithubSaved(true)
       setTimeout(() => setGithubSaved(false), 2000)
+    }
+  }
+
+  const handleOmnirouteUrlBlur = () => {
+    if (localOmnirouteUrl !== omnirouteUrl) {
+      setOmnirouteUrl(localOmnirouteUrl)
+      setOmnirouteSaved(true)
+      setTimeout(() => setOmnirouteSaved(false), 2000)
+    }
+  }
+
+  const handleOmnirouteApiKeyBlur = () => {
+    if (localOmnirouteApiKey !== omnirouteApiKey) {
+      setOmnirouteApiKey(localOmnirouteApiKey)
+      setOmnirouteSaved(true)
+      setTimeout(() => setOmnirouteSaved(false), 2000)
     }
   }
 
@@ -343,6 +371,59 @@ function APIKeyTab() {
         </div>
       </div>
 
+      {/* OmniRoute Gateway (Local AI Router) */}
+      <div className="space-y-4 border border-theme-primary/20 rounded-lg p-4 bg-theme-dim/10">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">OmniRoute Gateway (Local AI Router)</h3>
+          <p className="text-sm theme-secondary">
+            Connect to your self-hosted OmniRoute gateway to access 250+ providers, token compression, and team quota sharing.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs theme-secondary uppercase font-semibold">Local Endpoint</label>
+          <input
+            type="text"
+            value={localOmnirouteUrl}
+            onChange={(e) => setLocalOmnirouteUrl(e.target.value)}
+            onBlur={handleOmnirouteUrlBlur}
+            placeholder="http://localhost:20128/v1"
+            className="w-full px-4 py-3 bg-theme-dim border border-theme-primary rounded-lg
+              focus:outline-none focus:glow-box"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs theme-secondary uppercase font-semibold">API Key (Optional)</label>
+          <div className="relative">
+            <input
+              type={showOmnirouteKey ? 'text' : 'password'}
+              value={localOmnirouteApiKey}
+              onChange={(e) => setLocalOmnirouteApiKey(e.target.value)}
+              onBlur={handleOmnirouteApiKeyBlur}
+              placeholder="Enter local key if required..."
+              className="w-full px-4 py-3 pr-20 bg-theme-dim border border-theme-primary rounded-lg
+                focus:outline-none focus:glow-box"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {omnirouteSaved && (
+                <span className="flex items-center gap-1 text-xs text-green-500">
+                  <Check className="w-3 h-3" />
+                  Saved
+                </span>
+              )}
+              <button
+                onClick={() => setShowOmnirouteKey(!showOmnirouteKey)}
+                className="p-1 hover:theme-primary transition-colors"
+                aria-label={showOmnirouteKey ? 'Hide key' : 'Show key'}
+              >
+                {showOmnirouteKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Preferred API Provider */}
       <div className="space-y-2">
         <div>
@@ -362,6 +443,7 @@ function APIKeyTab() {
           <option value="github">Force GitHub Models (Free Premium Models)</option>
           <option value="groq">Force Groq Cloud (Free High-Speed Llama)</option>
           <option value="openrouter">Force OpenRouter (All AI Models / Paid)</option>
+          <option value="omniroute">Force OmniRoute Gateway (Local Proxy)</option>
         </select>
       </div>
 
